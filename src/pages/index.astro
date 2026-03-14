@@ -45,6 +45,14 @@ const todayCount = rows.filter((r) => r.publishedAt === today).length;
 				))
 			}
 		</div>
+		{rows.length > 10 && (
+			<button
+				class="block w-full max-w-[400px] mx-auto mt-6 py-3.5 font-mono text-xs tracking-[.06em] text-muted bg-surface border border-border rounded-sm cursor-pointer transition-all hover:text-ink hover:border-ink"
+				id="load-more"
+			>
+				もっと読む
+			</button>
+		)}
 		{
 			rows.length === 0 && (
 				<p class="text-center text-muted py-20 font-mono text-sm">

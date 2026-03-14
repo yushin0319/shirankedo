@@ -32,6 +32,7 @@ export const trackingRepos = sqliteTable("tracking_repos", {
   displayName: text("display_name").notNull(),
   description: text("description"),
   language: text("language"),
+  publishedAt: text("published_at"),
   createdAt: text("created_at").default(sql`(datetime('now'))`),
   updatedAt: text("updated_at"),
 });

@@ -33,6 +33,33 @@
   --font-display: "Caveat", cursive;
 }
 
+/* セキュリティページ用カラー
+   @theme に入れても Tailwind v4 がユーティリティを生成しないため手動定義 */
+.bg-critical {
+  background-color: #dc2626;
+}
+.text-critical {
+  color: #dc2626;
+}
+.bg-sec-green {
+  background-color: #16a34a;
+}
+.bg-major {
+  background-color: #7c3aed;
+}
+.bg-major-bg {
+  background-color: #ede9fe;
+}
+.text-major-text {
+  color: #5b21b6;
+}
+.bg-minor-bg {
+  background-color: #dcfce7;
+}
+.text-minor-text {
+  color: #166534;
+}
+
 @layer base {
   body {
     background-color: var(--color-bg);

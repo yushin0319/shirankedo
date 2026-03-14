@@ -8,14 +8,16 @@ export function parseModels(json: string): string[] {
   }
 }
 
-// 月額目安を計算（1Mトークン/月の仮定: 入力50万+出力50万 = 平均価格 × 1）
+// 月額目安を計算
+// シナリオ: input 1,200tok + output 200tok × 3,000 req/mo
+// = input 3.6M tok + output 0.6M tok
 export function estimateMonthly(
   inputPrice: number,
   outputPrice: number,
   currency: string,
 ): string {
-  const avg = (inputPrice + outputPrice) / 2;
-  if (currency === "JPY") return `¥${Math.round(avg).toLocaleString()}`;
-  const jpy = avg * 150; // 概算レート
+  const usd = inputPrice * 3.6 + outputPrice * 0.6;
+  if (currency === "JPY") return `¥${Math.round(usd).toLocaleString()}`;
+  const jpy = usd * 150; // 概算レート
   return `¥${Math.round(jpy).toLocaleString()}`;
 }
