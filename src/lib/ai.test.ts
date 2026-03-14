@@ -24,16 +24,19 @@ describe("parseModels", () => {
 });
 
 describe("estimateMonthly", () => {
+  // シナリオ: input 1,200tok + output 200tok × 3,000 req/mo
+  // = input 3.6M tok + output 0.6M tok
+  // usd = inputPrice * 3.6 + outputPrice * 0.6
   it("USD価格を円換算して月額目安を返す", () => {
-    // input=2.50, output=10.00 → avg=6.25 → 6.25*150=937.5 → ¥938
+    // usd = 2.5*3.6 + 10*0.6 = 9+6 = 15 → jpy = 15*150 = 2250
     const result = estimateMonthly(2.5, 10, "USD");
-    expect(result).toBe("¥938");
+    expect(result).toBe("¥2,250");
   });
 
   it("JPY価格はそのまま円表示する", () => {
-    // input=500, output=1500 → avg=1000 → ¥1,000
+    // usd = 500*3.6 + 1500*0.6 = 1800+900 = 2700
     const result = estimateMonthly(500, 1500, "JPY");
-    expect(result).toBe("¥1,000");
+    expect(result).toBe("¥2,700");
   });
 
   it("両方0なら¥0を返す", () => {

@@ -1,0 +1,1 @@
+ALTER TABLE `tracking_repos` ADD `published_at` text;
