@@ -56,6 +56,7 @@ CREATE TABLE `releases` (
 	`updated_at` text
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `releases_repo_tag_unique` ON `releases` (`repo`,`tag`);--> statement-breakpoint
 CREATE TABLE `repo_stats` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`repo` text NOT NULL,
@@ -97,6 +98,7 @@ CREATE TABLE `subscription_plans` (
 	`updated_at` text
 );
 --> statement-breakpoint
+CREATE UNIQUE INDEX `sub_plans_service_plan_unique` ON `subscription_plans` (`service`,`plan_name`);--> statement-breakpoint
 CREATE TABLE `tracking_repos` (
 	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
 	`repo` text NOT NULL,

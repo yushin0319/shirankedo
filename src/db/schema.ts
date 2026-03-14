@@ -1,7 +1,13 @@
 // ShiranKedo DB スキーマ（Drizzle ORM + D1）
 
 import { sql } from "drizzle-orm";
-import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  integer,
+  real,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 
 // 記事
 export const articles = sqliteTable("articles", {
@@ -50,16 +56,22 @@ export const vulnerabilities = sqliteTable("vulnerabilities", {
 });
 
 // リリース
-export const releases = sqliteTable("releases", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  repo: text("repo").notNull(),
-  tag: text("tag").notNull(),
-  version: text("version").notNull(),
-  type: text("type").notNull(),
-  publishedAt: text("published_at").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at"),
-});
+export const releases = sqliteTable(
+  "releases",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    repo: text("repo").notNull(),
+    tag: text("tag").notNull(),
+    version: text("version").notNull(),
+    type: text("type").notNull(),
+    publishedAt: text("published_at").notNull(),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at"),
+  },
+  (table) => [
+    uniqueIndex("releases_repo_tag_unique").on(table.repo, table.tag),
+  ],
+);
 
 // セキュリティ日次サマリー
 export const securityDaily = sqliteTable("security_daily", {
@@ -97,18 +109,27 @@ export const llmModelHistory = sqliteTable("llm_model_history", {
 });
 
 // サブスクプラン
-export const subscriptionPlans = sqliteTable("subscription_plans", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  provider: text("provider").notNull(),
-  service: text("service").notNull(),
-  planName: text("plan_name").notNull(),
-  price: real("price").notNull(),
-  currency: text("currency").notNull().default("USD"),
-  models: text("models").notNull(), // JSON配列
-  limits: text("limits"),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at"),
-});
+export const subscriptionPlans = sqliteTable(
+  "subscription_plans",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    provider: text("provider").notNull(),
+    service: text("service").notNull(),
+    planName: text("plan_name").notNull(),
+    price: real("price").notNull(),
+    currency: text("currency").notNull().default("USD"),
+    models: text("models").notNull(), // JSON配列
+    limits: text("limits"),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at"),
+  },
+  (table) => [
+    uniqueIndex("sub_plans_service_plan_unique").on(
+      table.service,
+      table.planName,
+    ),
+  ],
+);
 
 // サブスクプラン変更履歴
 export const subscriptionPlanHistory = sqliteTable(

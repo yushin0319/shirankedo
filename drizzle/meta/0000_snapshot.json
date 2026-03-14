@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "337b9251-ca1e-41f5-9a0c-bee9cfd92bae",
+  "id": "ec90ec97-e5ec-4a94-a884-203c2fe1523b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "articles": {
@@ -354,7 +354,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "releases_repo_tag_unique": {
+          "name": "releases_repo_tag_unique",
+          "columns": ["repo", "tag"],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
@@ -602,7 +608,13 @@
           "autoincrement": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "sub_plans_service_plan_unique": {
+          "name": "sub_plans_service_plan_unique",
+          "columns": ["service", "plan_name"],
+          "isUnique": true
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
