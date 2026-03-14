@@ -7,7 +7,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "lint": "npx @biomejs/biome check .",
+    "lint": "npx @biomejs/biome check . && astro check",
+    "check": "astro check",
     "test": "vitest run",
     "prepare": "husky"
   },
@@ -23,6 +24,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@astrojs/check": "^0.9.7",
     "@biomejs/biome": "^2.4.7",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
