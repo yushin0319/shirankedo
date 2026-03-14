@@ -48,6 +48,16 @@ function estimateMonthly(inputPrice: number, outputPrice: number, currency: stri
 	return `¥${Math.round(jpy).toLocaleString()}`;
 }
 
+// モデルリストのパース
+function parseModels(json: string): string[] {
+	try {
+		const parsed = JSON.parse(json);
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+}
+
 // ELOバー幅（最大スコア基準）
 const maxScore = Math.max(...models.map(m => m.score ?? 0), 1);
 ---
@@ -177,7 +187,7 @@ const maxScore = Math.max(...models.map(m => m.score ?? 0), 1);
 					</thead>
 					<tbody>
 						{plans.map((p) => {
-							const modelList: string[] = JSON.parse(p.models);
+							const modelList = parseModels(p.models);
 							const priceStr = p.price === 0
 								? "Free"
 								: p.currency === "JPY"
@@ -213,7 +223,7 @@ const maxScore = Math.max(...models.map(m => m.score ?? 0), 1);
 			{/* SP: カード */}
 			<div class="md:hidden flex flex-col gap-3">
 				{plans.map((p) => {
-					const modelList: string[] = JSON.parse(p.models);
+					const modelList = parseModels(p.models);
 					const priceStr = p.price === 0
 						? "Free"
 						: p.currency === "JPY"
