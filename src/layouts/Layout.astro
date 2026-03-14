@@ -1,24 +1,119 @@
 ---
 interface Props {
-  title: string;
+	title: string;
+	currentPage?: string;
 }
 
-const { title } = Astro.props;
+const { title, currentPage = "news" } = Astro.props;
+
+const navItems = [
+	{ id: "news", label: "ニュース", href: "/" },
+	{ id: "security", label: "セキュリティ", href: "/security" },
+	{ id: "trend", label: "トレンド", href: "/trend" },
+	{ id: "ai", label: "AI比較", href: "/ai" },
+];
 ---
 
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{title} | 知らんけど</title>
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  </head>
-  <body>
-    <slot />
-  </body>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>{title} | 知らんけど</title>
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+			rel="stylesheet"
+		/>
+	</head>
+	<body>
+		<header
+			class="sticky top-0 z-100 bg-surface border-b border-border shadow-[0_2px_8px_rgba(0,0,0,.05)]"
+		>
+			<div
+				class="max-w-[1060px] mx-auto px-10 h-14 flex items-center justify-between max-md:px-4"
+			>
+				<a href="/" class="font-display text-[22px] font-bold text-ink tracking-tight no-underline">
+					Shiran<span class="text-accent">Kedo</span>
+				</a>
+				<nav class="flex max-md:hidden">
+					{
+						navItems.map((item) => (
+							<a
+								href={item.href}
+								class:list={[
+									"font-mono text-[10px] tracking-[.06em] px-3 py-1.5 no-underline transition-colors",
+									currentPage === item.id
+										? "text-ink font-medium"
+										: "text-muted hover:text-ink",
+								]}
+							>
+								{item.label}
+							</a>
+						))
+					}
+				<a
+						href="/about"
+						class:list={[
+							"font-mono text-[10px] tracking-[.06em] px-2 py-1.5 no-underline transition-colors max-md:hidden",
+							currentPage === "about"
+								? "text-ink font-medium"
+								: "text-muted hover:text-ink",
+						]}
+					>?</a>
+				</nav>
+				<button
+					class="hidden max-md:flex flex-col gap-[5px] p-1 bg-transparent border-none cursor-pointer"
+					id="hamburger"
+				>
+					<span class="block w-5 h-[1.5px] bg-muted"></span>
+					<span class="block w-5 h-[1.5px] bg-muted"></span>
+					<span class="block w-5 h-[1.5px] bg-muted"></span>
+				</button>
+			</div>
+		</header>
+
+		<div
+			class="hidden fixed top-14 left-0 right-0 bg-surface border-b border-border px-5 py-3 flex-col z-99"
+			id="mobile-nav"
+		>
+			{
+				navItems.map((item) => (
+					<a
+						href={item.href}
+						class:list={[
+							"font-mono text-xs tracking-[.06em] py-2.5 no-underline border-b border-border",
+							currentPage === item.id ? "text-ink" : "text-muted",
+						]}
+					>
+						{item.label}
+					</a>
+				))
+			}
+			<a
+				href="/about"
+				class:list={[
+					"font-mono text-xs tracking-[.06em] py-2.5 no-underline",
+					currentPage === "about" ? "text-ink" : "text-muted",
+				]}
+			>
+				About
+			</a>
+		</div>
+
+		<slot />
+
+		<script>
+			const hamburger = document.getElementById("hamburger");
+			const mobileNav = document.getElementById("mobile-nav");
+			hamburger?.addEventListener("click", () => {
+				mobileNav?.classList.toggle("hidden");
+				mobileNav?.classList.toggle("flex");
+			});
+		</script>
+	</body>
 </html>
 
 <style is:global>
-  @import "../styles/global.css";
+	@import "../styles/global.css";
 </style>
