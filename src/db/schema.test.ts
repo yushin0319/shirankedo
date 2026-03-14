@@ -1,3 +1,4 @@
+import type Database from "better-sqlite3";
 import { desc, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -17,12 +18,12 @@ import { createTestDb } from "./test-helper";
 type TestDb = ReturnType<typeof createTestDb>["db"];
 
 let db: TestDb;
-let sqlite: ReturnType<typeof import("better-sqlite3")["default"]>;
+let sqlite: InstanceType<typeof Database>;
 
 beforeEach(() => {
   const t = createTestDb();
   db = t.db;
-  sqlite = t.sqlite as ReturnType<typeof import("better-sqlite3")["default"]>;
+  sqlite = t.sqlite as InstanceType<typeof Database>;
 
   // スキーマからテーブル作成（マイグレーションの代わり）
   sqlite.exec(`
