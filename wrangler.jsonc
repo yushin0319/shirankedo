@@ -1,0 +1,9 @@
+{
+  "name": "shirankedo",
+  "compatibility_date": "2026-03-14",
+  "compatibility_flags": ["nodejs_compat"]
+
+  // D1・KV はリソース作成後に追加:
+  // "d1_databases": [{ "binding": "DB", "database_name": "shirankedo", "database_id": "..." }]
+  // "kv_namespaces": [{ "binding": "KV", "id": "..." }]
+}
