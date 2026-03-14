@@ -1,0 +1,259 @@
+---
+import { env } from "cloudflare:workers";
+import { desc, sql } from "drizzle-orm";
+import Layout from "../layouts/Layout.astro";
+import { getDb } from "../db/client";
+import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
+
+const db = getDb(env.DB);
+
+const models = await db
+	.select()
+	.from(llmModels)
+	.orderBy(desc(llmModels.score));
+
+const plans = await db
+	.select()
+	.from(subscriptionPlans)
+	.orderBy(subscriptionPlans.provider, subscriptionPlans.price);
+
+// コメント取得
+const apiComment = await db
+	.select()
+	.from(pageComments)
+	.where(sql`${pageComments.type} = 'ai_api'`)
+	.orderBy(desc(pageComments.createdAt))
+	.limit(1);
+
+const subComment = await db
+	.select()
+	.from(pageComments)
+	.where(sql`${pageComments.type} = 'ai_sub'`)
+	.orderBy(desc(pageComments.createdAt))
+	.limit(1);
+
+// プロバイダーのドット色
+const providerDotColors: Record<string, string> = {
+	OpenAI: "bg-green-500",
+	Anthropic: "bg-orange-500",
+	Google: "bg-blue-500",
+};
+
+// 月額目安（USD → JPY概算、JPYはそのまま）
+function estimateMonthly(inputPrice: number, outputPrice: number, currency: string): string {
+	// 1Mトークン/月の仮定: 入力50万+出力50万 = 平均価格 × 1
+	const avg = (inputPrice + outputPrice) / 2;
+	if (currency === "JPY") return `¥${Math.round(avg).toLocaleString()}`;
+	const jpy = avg * 150; // 概算レート
+	return `¥${Math.round(jpy).toLocaleString()}`;
+}
+
+// ELOバー幅（最大スコア基準）
+const maxScore = Math.max(...models.map(m => m.score ?? 0), 1);
+---
+
+<Layout title="AI比較" currentPage="ai">
+	<div class="relative z-1 max-w-[1060px] mx-auto px-10 pt-7 pb-5 max-md:px-4 max-md:pt-5 max-md:pb-4">
+		<h1 class="font-mono text-[11px] text-muted tracking-[.06em] uppercase">AI Model Comparison</h1>
+	</div>
+	<main class="relative z-1 max-w-[1060px] mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
+		{/* API利用セクション */}
+		<section class="mb-12">
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-4">API Pricing</h2>
+
+			{apiComment[0] && (
+				<div class="relative max-w-[400px] mb-6 p-4 pb-5.5 bg-sticky-4 rotate-[-0.5deg] shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)]">
+					<p class="text-xs leading-[1.8] text-sticky-ink">{apiComment[0].content}</p>
+					<div class="sticky-fold"></div>
+				</div>
+			)}
+
+			{/* PC: テーブル */}
+			<div class="hidden md:block">
+				<table class="w-full border-collapse">
+					<thead>
+						<tr class="border-b border-border">
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2">Model</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2">Provider</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2 w-40">Intelligence</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-2">Input</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-2">Output</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-2">月額目安</th>
+						</tr>
+					</thead>
+					<tbody>
+						{models.map((m) => {
+							const barWidth = m.score ? Math.round((m.score / maxScore) * 100) : 0;
+							return (
+								<tr class="border-b border-border hover:bg-surface/50 transition-colors">
+									<td class="py-3 text-[13px] font-bold text-ink tracking-tight">{m.modelName}</td>
+									<td class="py-3">
+										<span class="flex items-center gap-1.5">
+											<span class:list={["w-1.5 h-1.5 rounded-full", providerDotColors[m.provider] ?? "bg-muted"]}></span>
+											<span class="font-mono text-[10px] text-muted">{m.provider}</span>
+										</span>
+									</td>
+									<td class="py-3">
+										<div class="flex items-center gap-2">
+											<div class="w-20 h-1.5 bg-border rounded-full overflow-hidden">
+												<div class="h-full bg-accent rounded-full" style={`width: ${barWidth}%`}></div>
+											</div>
+											<span class="font-mono text-[10px] text-muted">{m.score?.toFixed(0) ?? "—"}</span>
+										</div>
+									</td>
+									<td class="font-mono text-[11px] text-ink text-right py-3">${m.inputPrice.toFixed(2)}</td>
+									<td class="font-mono text-[11px] text-ink text-right py-3">${m.outputPrice.toFixed(2)}</td>
+									<td class="font-mono text-[11px] text-muted text-right py-3">{estimateMonthly(m.inputPrice, m.outputPrice, m.currency)}</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+
+			{/* SP: カード */}
+			<div class="md:hidden flex flex-col gap-3">
+				{models.map((m) => {
+					const barWidth = m.score ? Math.round((m.score / maxScore) * 100) : 0;
+					return (
+						<div class="bg-surface border border-border rounded-sm shadow-[2px_2px_0_rgba(0,0,0,.06)] p-4">
+							<div class="flex items-start justify-between mb-2">
+								<div>
+									<div class="text-[13px] font-bold text-ink">{m.modelName}</div>
+									<span class="flex items-center gap-1.5 mt-0.5">
+										<span class:list={["w-1.5 h-1.5 rounded-full", providerDotColors[m.provider] ?? "bg-muted"]}></span>
+										<span class="font-mono text-[10px] text-muted">{m.provider}</span>
+									</span>
+								</div>
+								<div class="flex items-center gap-2">
+									<div class="w-14 h-1.5 bg-border rounded-full overflow-hidden">
+										<div class="h-full bg-accent rounded-full" style={`width: ${barWidth}%`}></div>
+									</div>
+									<span class="font-mono text-[10px] text-muted">{m.score?.toFixed(0) ?? "—"}</span>
+								</div>
+							</div>
+							<div class="grid grid-cols-3 gap-2 mt-2">
+								<div>
+									<span class="font-mono text-[9px] text-muted">Input</span>
+									<div class="font-mono text-[11px] text-ink font-medium">${m.inputPrice.toFixed(2)}</div>
+								</div>
+								<div>
+									<span class="font-mono text-[9px] text-muted">Output</span>
+									<div class="font-mono text-[11px] text-ink font-medium">${m.outputPrice.toFixed(2)}</div>
+								</div>
+								<div>
+									<span class="font-mono text-[9px] text-muted">月額目安</span>
+									<div class="font-mono text-[11px] text-muted">{estimateMonthly(m.inputPrice, m.outputPrice, m.currency)}</div>
+								</div>
+							</div>
+						</div>
+					);
+				})}
+			</div>
+		</section>
+
+		{/* サブスク比較セクション */}
+		<section>
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-4">Subscription Plans</h2>
+
+			{subComment[0] && (
+				<div class="relative max-w-[400px] mb-6 p-4 pb-5.5 bg-sticky-4 rotate-[0.5deg] shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)]">
+					<p class="text-xs leading-[1.8] text-sticky-ink">{subComment[0].content}</p>
+					<div class="sticky-fold"></div>
+				</div>
+			)}
+
+			{/* PC: テーブル */}
+			<div class="hidden md:block">
+				<table class="w-full border-collapse">
+					<thead>
+						<tr class="border-b border-border">
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2">Service</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2">Plan</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-2">月額</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2 pl-4">Models</th>
+							<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-2">制限</th>
+						</tr>
+					</thead>
+					<tbody>
+						{plans.map((p) => {
+							const modelList: string[] = JSON.parse(p.models);
+							const priceStr = p.price === 0
+								? "Free"
+								: p.currency === "JPY"
+									? `¥${p.price.toLocaleString()}`
+									: `$${p.price}`;
+							return (
+								<tr class="border-b border-border hover:bg-surface/50 transition-colors">
+									<td class="py-3">
+										<span class="flex items-center gap-1.5">
+											<span class:list={["w-1.5 h-1.5 rounded-full", providerDotColors[p.provider] ?? "bg-muted"]}></span>
+											<span class="text-[13px] font-bold text-ink">{p.service}</span>
+										</span>
+									</td>
+									<td class="py-3 font-mono text-[11px] text-ink">{p.planName}</td>
+									<td class="py-3 font-mono text-[11px] text-ink text-right font-medium">{priceStr}</td>
+									<td class="py-3 pl-4">
+										<div class="flex gap-1 flex-wrap">
+											{modelList.map((model) => (
+												<span class="font-mono text-[9px] tracking-[.04em] px-1.5 py-0.5 rounded-sm bg-tag-ai-bg text-tag-ai-text">
+													{model}
+												</span>
+											))}
+										</div>
+									</td>
+									<td class="py-3 text-[11px] text-muted">{p.limits ?? "—"}</td>
+								</tr>
+							);
+						})}
+					</tbody>
+				</table>
+			</div>
+
+			{/* SP: カード */}
+			<div class="md:hidden flex flex-col gap-3">
+				{plans.map((p) => {
+					const modelList: string[] = JSON.parse(p.models);
+					const priceStr = p.price === 0
+						? "Free"
+						: p.currency === "JPY"
+							? `¥${p.price.toLocaleString()}`
+							: `$${p.price}`;
+					return (
+						<div class="bg-surface border border-border rounded-sm shadow-[2px_2px_0_rgba(0,0,0,.06)] p-4">
+							<div class="flex items-center justify-between mb-2">
+								<span class="flex items-center gap-1.5">
+									<span class:list={["w-1.5 h-1.5 rounded-full", providerDotColors[p.provider] ?? "bg-muted"]}></span>
+									<span class="text-[13px] font-bold text-ink">{p.service}</span>
+									<span class="font-mono text-[10px] text-muted ml-1">{p.planName}</span>
+								</span>
+								<span class="font-mono text-[12px] text-ink font-medium">{priceStr}</span>
+							</div>
+							<div class="flex gap-1 flex-wrap mb-2">
+								{modelList.map((model) => (
+									<span class="font-mono text-[9px] tracking-[.04em] px-1.5 py-0.5 rounded-sm bg-tag-ai-bg text-tag-ai-text">
+										{model}
+									</span>
+								))}
+							</div>
+							{p.limits && <div class="text-[11px] text-muted">{p.limits}</div>}
+						</div>
+					);
+				})}
+			</div>
+		</section>
+	</main>
+</Layout>
+
+<style>
+	.sticky-fold {
+		position: absolute;
+		bottom: 0;
+		right: 0;
+		width: 0;
+		height: 0;
+		border-style: solid;
+		border-width: 0 0 20px 20px;
+		border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
+	}
+</style>
