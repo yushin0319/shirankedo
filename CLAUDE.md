@@ -21,7 +21,8 @@
 
 ## コマンド
 
-- **開発サーバー**: `npm run dev`（miniflare で D1/KV ローカルエミュレート）
+- **開発サーバー**: `npm run dev`（= `astro dev`。Vite HMR + miniflare D1/KV）
+- **⚠️ `wrangler dev` 禁止**: dist/ の古いビルドを配信するためCSS変更が反映されない。必ず `npm run dev` を使う
 - **ビルド**: `npm run build`
 - **テスト**: `npm test`
 - **Lint**: `npx @biomejs/biome check .`

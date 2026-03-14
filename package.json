@@ -36,6 +36,11 @@
     "vitest": "^4.1.0",
     "wrangler": "^4.73.0"
   },
+  "overrides": {
+    "lodash": ">=4.17.23",
+    "undici": ">=7.24.0",
+    "esbuild": ">=0.25.0"
+  },
   "lint-staged": {
     "*.{js,ts,jsx,tsx,css,json,astro}": [
       "biome check --write --no-errors-on-unmatched"
