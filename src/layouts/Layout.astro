@@ -8,9 +8,9 @@ const { title, currentPage = "news" } = Astro.props;
 
 const navItems = [
 	{ id: "news", label: "ニュース", href: "/" },
+	{ id: "security", label: "セキュリティ", href: "/security" },
 	{ id: "trend", label: "トレンド", href: "/trend" },
 	{ id: "ai", label: "AI比較", href: "/ai" },
-	{ id: "security", label: "セキュリティ", href: "/security" },
 ];
 ---
 
@@ -52,6 +52,15 @@ const navItems = [
 							</a>
 						))
 					}
+				<a
+						href="/about"
+						class:list={[
+							"font-mono text-[10px] tracking-[.06em] px-2 py-1.5 no-underline transition-colors max-md:hidden",
+							currentPage === "about"
+								? "text-ink font-medium"
+								: "text-muted hover:text-ink",
+						]}
+					>?</a>
 				</nav>
 				<button
 					class="hidden max-md:flex flex-col gap-[5px] p-1 bg-transparent border-none cursor-pointer"
@@ -81,6 +90,15 @@ const navItems = [
 					</a>
 				))
 			}
+			<a
+				href="/about"
+				class:list={[
+					"font-mono text-xs tracking-[.06em] py-2.5 no-underline",
+					currentPage === "about" ? "text-ink" : "text-muted",
+				]}
+			>
+				About
+			</a>
 		</div>
 
 		<slot />
