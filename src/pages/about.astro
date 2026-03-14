@@ -1,0 +1,55 @@
+---
+import Layout from "../layouts/Layout.astro";
+---
+
+<Layout title="About" currentPage="about">
+	<main class="relative z-1 max-w-[700px] mx-auto px-10 py-12 max-md:px-4 max-md:py-8">
+		<h1 class="font-display text-3xl font-bold text-ink mb-6">
+			Shiran<span class="text-accent">Kedo</span>
+		</h1>
+
+		<section class="mb-8">
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">About</h2>
+			<p class="text-[14px] leading-[1.8] text-ink">
+				テック界隈で今日起きたことを3分で把握するダッシュボード。<br />
+				ニュース・セキュリティ・トレンド・AI比較の4つの視点から、エンジニアに必要な情報をコンパクトにお届けします。
+			</p>
+		</section>
+
+		<section class="mb-8">
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">Data Sources</h2>
+			<div class="flex flex-wrap gap-2">
+				{[
+					"Hacker News",
+					"はてなブックマーク",
+					"Zenn",
+					"Lobsters",
+					"arXiv",
+					"NVD (CVE)",
+					"GitHub API",
+					"Artificial Analysis",
+					"LiteLLM",
+				].map((source) => (
+					<span class="font-mono text-[10px] tracking-[.04em] px-2.5 py-1 rounded-sm bg-surface border border-border text-ink">
+						{source}
+					</span>
+				))}
+			</div>
+		</section>
+
+		<section class="mb-8">
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">Disclaimer</h2>
+			<p class="text-[13px] leading-[1.8] text-muted">
+				本サイトのコンテンツはAI（Gemini）によって生成・要約されています。
+				情報の正確性は保証しません。重要な判断の際は必ず一次情報をご確認ください。
+			</p>
+		</section>
+
+		<section>
+			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">Operator</h2>
+			<p class="text-[13px] leading-[1.8] text-muted">
+				個人プロジェクトとして運営しています。
+			</p>
+		</section>
+	</main>
+</Layout>
