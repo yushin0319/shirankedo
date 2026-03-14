@@ -7,13 +7,17 @@ import { trackingRepos, repoStats, pageComments } from "../db/schema";
 
 const db = getDb(env.DB);
 
-// 最新2週分のスター数を取得してランキング算出
+// リポ情報 + 直近2週分のスター数のみ取得（全件取得を避ける）
 const repos = await db.select().from(trackingRepos);
 
-// 各リポの最新スター数と1週前のスター数を取得
+const twoWeeksAgo = new Date();
+twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 15);
+const cutoff = twoWeeksAgo.toISOString().slice(0, 10);
+
 const latestStats = await db
 	.select()
 	.from(repoStats)
+	.where(sql`${repoStats.createdAt} >= ${cutoff}`)
 	.orderBy(desc(repoStats.createdAt));
 
 // リポごとに最新と1つ前を取得
