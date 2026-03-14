@@ -1,0 +1,100 @@
+---
+import { getTagKey } from "../lib/tags";
+import { formatRelativeDate, isToday } from "../lib/date";
+
+interface Props {
+	title: string;
+	summary: string;
+	comment: string;
+	url: string;
+	source: string;
+	tags: string[];
+	publishedAt: string;
+	isPaper: boolean;
+	index: number;
+}
+
+const { title, summary, comment, url, source, tags, publishedAt, isPaper, index } = Astro.props;
+const isNew = isToday(publishedAt);
+
+// 付箋色のローテーション（5色）
+const stickyColors = ["bg-sticky-2", "bg-sticky-1", "bg-sticky-3", "bg-sticky-4", "bg-sticky-5"];
+const stickyRotations = ["rotate-[1.2deg]", "-rotate-[1deg]", "rotate-[1.8deg]", "-rotate-[0.7deg]", "rotate-[0.9deg]"];
+const stickyColor = stickyColors[index % 5];
+const stickyRotation = stickyRotations[index % 5];
+
+// ソース表示名
+const sourceNames: Record<string, string> = {
+	hackernews: "Hacker News",
+	hatena: "はてブ",
+	zenn: "Zenn",
+	lobsters: "Lobsters",
+	arxiv: "arXiv",
+};
+const displaySource = source.split(",").map(s => sourceNames[s.trim()] ?? s.trim()).join(" / ");
+
+// タグ色マップ
+const tagColorMap: Record<string, string> = {
+	ai: "bg-tag-ai-bg text-tag-ai-text",
+	security: "bg-tag-security-bg text-tag-security-text",
+	oss: "bg-tag-oss-bg text-tag-oss-text",
+	frontend: "bg-tag-frontend-bg text-tag-frontend-text",
+	infra: "bg-tag-infra-bg text-tag-infra-text",
+	lang: "bg-tag-lang-bg text-tag-lang-text",
+	data: "bg-tag-data-bg text-tag-data-text",
+	career: "bg-tag-career-bg text-tag-career-text",
+};
+---
+
+<div class="relative bg-surface border border-border rounded-sm mb-4 grid grid-cols-[1fr_260px] max-md:grid-cols-1 shadow-[2px_2px_0_rgba(0,0,0,.06)] overflow-visible">
+	<div class="p-6 max-md:p-4">
+		<div class="flex gap-1.5 mb-2.5 items-center flex-wrap">
+			{isNew && (
+				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-accent text-white font-medium">NEW</span>
+			)}
+			{isPaper && (
+				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-ink text-white font-medium">PAPER</span>
+			)}
+			{tags.map(tag => {
+				const key = getTagKey(tag);
+				return (
+					<span class:list={["font-mono text-[9px] tracking-[.1em] px-2 py-0.5 rounded-sm", tagColorMap[key] ?? tagColorMap.career]}>
+						{tag}
+					</span>
+				);
+			})}
+		</div>
+		<h2 class="text-[15px] font-bold leading-[1.55] text-ink mb-2.5 tracking-tight">{title}</h2>
+		<p class="text-[12.5px] leading-[1.75] text-muted mb-3.5">{summary}</p>
+		<div class="flex items-center gap-2">
+			<span class="font-mono text-[10px] text-muted tracking-[.04em]">{displaySource}</span>
+			<span class="w-[3px] h-[3px] bg-border rounded-full"></span>
+			<span class="font-mono text-[10px] text-muted tracking-[.04em]">{formatRelativeDate(publishedAt)}</span>
+			<a href={url} target="_blank" rel="noopener noreferrer" class="font-mono text-[10px] text-accent no-underline tracking-[.04em] ml-3 hover:underline">元記事 →</a>
+		</div>
+	</div>
+	<div class="p-5 max-md:px-4 max-md:pt-1 max-md:pb-4 flex items-center justify-center max-md:justify-start">
+		<div class:list={[
+			"relative w-full max-w-60 max-md:max-w-full p-4 pb-5.5 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)]",
+			stickyColor,
+			stickyRotation,
+			"max-md:!rotate-0"
+		]}>
+			<p class="text-xs leading-[1.8] text-sticky-ink">{comment}</p>
+			<div class="sticky-fold max-md:hidden"></div>
+		</div>
+	</div>
+</div>
+
+<style>
+	.sticky-fold {
+		position: absolute;
+		bottom: 0;
+		right: 0;
+		width: 0;
+		height: 0;
+		border-style: solid;
+		border-width: 0 0 20px 20px;
+		border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
+	}
+</style>

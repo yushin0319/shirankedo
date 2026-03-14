@@ -1,1 +1,56 @@
 @import "tailwindcss";
+
+@theme {
+  --color-bg: #f0ece3;
+  --color-surface: #fafaf7;
+  --color-border: #ddd8ce;
+  --color-ink: #1a1a1a;
+  --color-muted: #888;
+  --color-accent: #e8003a;
+  --color-sticky-1: #fff9b0;
+  --color-sticky-2: #ffd6e0;
+  --color-sticky-3: #c8f7c5;
+  --color-sticky-4: #c5e8f7;
+  --color-sticky-5: #e8c5f7;
+  --color-sticky-ink: #2a1a0a;
+  --color-tag-ai-bg: #e0f2fe;
+  --color-tag-ai-text: #0369a1;
+  --color-tag-security-bg: #fef3c7;
+  --color-tag-security-text: #92400e;
+  --color-tag-oss-bg: #dcfce7;
+  --color-tag-oss-text: #166534;
+  --color-tag-frontend-bg: #ede9fe;
+  --color-tag-frontend-text: #5b21b6;
+  --color-tag-infra-bg: #fce7f3;
+  --color-tag-infra-text: #9d174d;
+  --color-tag-lang-bg: #f0fdf4;
+  --color-tag-lang-text: #15803d;
+  --color-tag-data-bg: #fef9c3;
+  --color-tag-data-text: #854d0e;
+  --color-tag-career-bg: #f1f5f9;
+  --color-tag-career-text: #475569;
+  --font-mono: "DM Mono", monospace;
+  --font-display: "Caveat", cursive;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: "Noto Sans JP", sans-serif;
+    min-height: 100vh;
+  }
+
+  /* 方眼背景 */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+    background-size: 24px 24px;
+    pointer-events: none;
+    z-index: 0;
+  }
+}
