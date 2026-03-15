@@ -100,6 +100,7 @@ export async function processTrackingRepos(
           displayName: item.displayName,
           description: item.description,
           language: item.language,
+          publishedAt: item.publishedAt,
           updatedAt: new Date().toISOString(),
         })
         .where(eq(trackingRepos.repo, item.repo));

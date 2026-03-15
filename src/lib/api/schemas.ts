@@ -53,6 +53,7 @@ export const trackingRepoSchema = z.object({
   displayName: z.string().min(1),
   description: z.string().optional(),
   language: z.string().optional(),
+  publishedAt: z.string().optional(),
 });
 
 /** Star推移（週次スナップショット） */

@@ -91,23 +91,31 @@ describe("processTrackingRepos", () => {
     displayName: "Next.js",
     description: "Reactフレームワーク",
     language: "TypeScript",
+    publishedAt: "2016-10-25",
   };
 
-  it("リポジトリを INSERT できる", async () => {
+  it("リポジトリを INSERT できる（publishedAt含む）", async () => {
     const result = await processTrackingRepos(db, [validRepo]);
     expect(result.inserted).toBe(1);
     expect(result.updated).toBe(0);
+    const rows = await db.select().from(trackingRepos);
+    expect(rows[0].publishedAt).toBe("2016-10-25");
   });
 
-  it("既存リポを UPDATE できる", async () => {
+  it("既存リポを UPDATE できる（publishedAt更新）", async () => {
     await processTrackingRepos(db, [validRepo]);
     const result = await processTrackingRepos(db, [
-      { ...validRepo, description: "更新された説明" },
+      {
+        ...validRepo,
+        description: "更新された説明",
+        publishedAt: "2016-01-01",
+      },
     ]);
     expect(result.inserted).toBe(0);
     expect(result.updated).toBe(1);
     const rows = await db.select().from(trackingRepos);
     expect(rows[0].description).toBe("更新された説明");
+    expect(rows[0].publishedAt).toBe("2016-01-01");
   });
 });
 
