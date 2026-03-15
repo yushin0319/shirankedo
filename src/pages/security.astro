@@ -18,14 +18,12 @@ const daily = await db
 const vulns = await db
 	.select()
 	.from(vulnerabilities)
-	.orderBy(desc(vulnerabilities.cvssScore))
-	.limit(20);
+	.orderBy(desc(vulnerabilities.cvssScore));
 
 const rels = await db
 	.select()
 	.from(releases)
-	.orderBy(desc(releases.publishedAt))
-	.limit(20);
+	.orderBy(desc(releases.publishedAt));
 
 const dailyComment = daily[0]?.comment ?? null;
 

@@ -83,7 +83,7 @@ describe("AiTabs", () => {
     });
   });
 
-  describe("もっと見る", () => {
+  describe("もっと見る（段階追加）", () => {
     it("11件目以降が非表示", () => {
       render(<AiTabs {...defaultProps} />);
       const tbody = document.getElementById("api-tbody");
@@ -94,27 +94,60 @@ describe("AiTabs", () => {
       expect(visibleRows.length).toBe(10);
     });
 
-    it("「もっと見る」クリックで全件表示", async () => {
+    it("「もっと見る」クリックで10件ずつ追加表示される", async () => {
       const user = userEvent.setup();
-      render(<AiTabs {...defaultProps} />);
+      // 25件で段階追加をテスト
+      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
 
+      const moreBtn = screen.getByText("+ もっと見る");
+      await user.click(moreBtn);
+
+      // 1回クリック: 20件表示
+      const tbody = document.getElementById("api-tbody");
+      const visibleAfter1 = Array.from(
+        tbody?.querySelectorAll("tr") ?? [],
+      ).filter((r) => !r.classList.contains("api-hidden"));
+      expect(visibleAfter1.length).toBe(20);
+
+      // ボタンはまだ表示されている
+      expect(screen.getByText("+ もっと見る")).toBeInTheDocument();
+    });
+
+    it("全件表示でボタンが消える", async () => {
+      const user = userEvent.setup();
+      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
+
+      // 2回クリックで全件表示
+      await user.click(screen.getByText("+ もっと見る"));
       await user.click(screen.getByText("+ もっと見る"));
 
       const tbody = document.getElementById("api-tbody");
       const hiddenRows = tbody?.querySelectorAll("tr.api-hidden") ?? [];
       expect(hiddenRows.length).toBe(0);
+
+      // ボタンが消えている
+      expect(screen.queryByText("+ もっと見る")).not.toBeInTheDocument();
     });
 
-    it("「閉じる」クリックで10件に戻る", async () => {
+    it("ソート変更で表示件数がリセットされる", async () => {
       const user = userEvent.setup();
-      render(<AiTabs {...defaultProps} />);
+      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
 
+      // もっと見るで20件表示
       await user.click(screen.getByText("+ もっと見る"));
-      await user.click(screen.getByText("- 閉じる"));
 
+      // ソート変更
+      const providerHeader = document.querySelector(
+        '#tab-text th[data-sort="provider"]',
+      );
+      await user.click(providerHeader!);
+
+      // 10件に戻る
       const tbody = document.getElementById("api-tbody");
-      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden") ?? [];
-      expect(hiddenRows.length).toBe(2);
+      const visibleRows = Array.from(
+        tbody?.querySelectorAll("tr") ?? [],
+      ).filter((r) => !r.classList.contains("api-hidden"));
+      expect(visibleRows.length).toBe(10);
     });
   });
 
