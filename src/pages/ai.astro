@@ -19,15 +19,23 @@ const plans = await db
 	.from(subscriptionPlans)
 	.orderBy(subscriptionPlans.provider, subscriptionPlans.price);
 
-// AI比較コメント（ページ全体で1つ）
-const aiComment = await db
+// AI比較コメント（タブごとに1つ）
+const aiApiComment = await db
 	.select()
 	.from(pageComments)
 	.where(sql`${pageComments.type} = 'ai_api'`)
 	.orderBy(desc(pageComments.createdAt))
 	.limit(1);
 
-const commentText = aiComment[0]?.content ?? null;
+const aiSubComment = await db
+	.select()
+	.from(pageComments)
+	.where(sql`${pageComments.type} = 'ai_sub'`)
+	.orderBy(desc(pageComments.createdAt))
+	.limit(1);
+
+const apiCommentText = aiApiComment[0]?.content ?? null;
+const subCommentText = aiSubComment[0]?.content ?? null;
 
 // プロバイダーのドット色（20色）
 const providerDotClass: Record<string, string> = {
@@ -66,7 +74,8 @@ const providerDotClass: Record<string, string> = {
 		client:idle
 		models={models}
 		plans={plans}
-		commentText={commentText}
+		apiCommentText={apiCommentText}
+		subCommentText={subCommentText}
 		providerDotClass={providerDotClass}
 	/>
 </Layout>
