@@ -38,7 +38,7 @@
 
 - **本番URL**: https://shirankedo.y-fudo.workers.dev/
 - **デプロイ方法**: `npm run build && npx wrangler deploy`
-- **自動デプロイ**: 未設定（#334 で CI 化予定）
+- **自動デプロイ**: CI（lint+build）成功後に `wrangler deploy`（`deploy.yml`）
 
 ## 設計ドキュメント
 
