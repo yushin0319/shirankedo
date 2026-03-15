@@ -41,7 +41,6 @@ const defaultProps = {
   rels: makeReleases(12),
   repoMap,
   dailyComment: "今日のセキュリティコメント",
-  displayDate: "2026 / 03 / 14",
 };
 
 describe("SecurityTabs", () => {

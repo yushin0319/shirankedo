@@ -40,13 +40,19 @@ const displayDate = formatDisplayDate(today);
 ---
 
 <Layout title="セキュリティ" currentPage="security">
+	<div
+		class="relative z-1 max-w-265 mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5"
+	>
+		<div class="font-mono text-[11px] text-muted tracking-[.06em]">
+			{displayDate}
+		</div>
+	</div>
 	<SecurityTabs
 		client:idle
 		vulns={vulns}
 		rels={rels}
 		repoMap={repoMap}
 		dailyComment={dailyComment}
-		displayDate={displayDate}
 	/>
 </Layout>
 

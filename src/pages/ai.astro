@@ -5,6 +5,7 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
+import { formatDisplayDate } from "../lib/date";
 
 const db = getDb(env.DB);
 
@@ -54,6 +55,13 @@ const providerDotClass: Record<string, string> = {
 ---
 
 <Layout title="AI比較" currentPage="ai">
+	<div
+		class="relative z-1 max-w-265 mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5"
+	>
+		<div class="font-mono text-[11px] text-muted tracking-[.06em]">
+			{formatDisplayDate(new Date().toISOString().slice(0, 10))}
+		</div>
+	</div>
 	<AiTabs
 		client:idle
 		models={models}
