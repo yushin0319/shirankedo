@@ -23,6 +23,8 @@ function formatDate(dateStr: string): string {
 
 type TabId = "summary" | "vulns" | "updates";
 
+const STEP = 10;
+
 export function SecurityTabs({
   vulns,
   rels,
@@ -30,8 +32,8 @@ export function SecurityTabs({
   dailyComment,
 }: SecurityTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("summary");
-  const [vulnExpanded, setVulnExpanded] = useState(false);
-  const [updateExpanded, setUpdateExpanded] = useState(false);
+  const [vulnVisibleCount, setVulnVisibleCount] = useState(STEP);
+  const [updateVisibleCount, setUpdateVisibleCount] = useState(STEP);
 
   const vulnTop5 = vulns.slice(0, 5);
   const relTop5 = rels.slice(0, 5);
@@ -184,7 +186,7 @@ export function SecurityTabs({
             <div
               key={v.id}
               className={`vuln-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)]${
-                !vulnExpanded && i >= 10 ? " vuln-hidden" : ""
+                i >= vulnVisibleCount ? " vuln-hidden" : ""
               }`}
             >
               <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-critical" />
@@ -207,14 +209,18 @@ export function SecurityTabs({
             </div>
           ))}
 
-          {vulns.length > 10 && (
+          {vulnVisibleCount < vulns.length && (
             <button
               type="button"
               className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
               id="vuln-more"
-              onClick={() => setVulnExpanded((prev) => !prev)}
+              onClick={() =>
+                setVulnVisibleCount((prev) =>
+                  Math.min(prev + STEP, vulns.length),
+                )
+              }
             >
-              {vulnExpanded ? "- 閉じる" : "+ もっと見る"}
+              + もっと見る
             </button>
           )}
         </div>
@@ -242,7 +248,7 @@ export function SecurityTabs({
               <div
                 key={r.id}
                 className={`update-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:flex-col max-md:items-start max-md:gap-1.5 max-md:px-5${
-                  !updateExpanded && i >= 10 ? " update-hidden" : ""
+                  i >= updateVisibleCount ? " update-hidden" : ""
                 }`}
               >
                 {isMajor ? (
@@ -279,14 +285,18 @@ export function SecurityTabs({
             );
           })}
 
-          {rels.length > 10 && (
+          {updateVisibleCount < rels.length && (
             <button
               type="button"
               className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
               id="update-more"
-              onClick={() => setUpdateExpanded((prev) => !prev)}
+              onClick={() =>
+                setUpdateVisibleCount((prev) =>
+                  Math.min(prev + STEP, rels.length),
+                )
+              }
             >
-              {updateExpanded ? "- 閉じる" : "+ もっと見る"}
+              + もっと見る
             </button>
           )}
         </div>

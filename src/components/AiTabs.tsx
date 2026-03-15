@@ -36,6 +36,8 @@ type SubRow = {
   dotClass: string;
 };
 
+const STEP = 10;
+
 export function AiTabs({
   models,
   plans,
@@ -52,7 +54,7 @@ export function AiTabs({
     key: "provider",
     dir: "asc",
   });
-  const [apiExpanded, setApiExpanded] = useState(false);
+  const [apiVisibleCount, setApiVisibleCount] = useState(STEP);
 
   // API行データを事前計算
   const apiRows: ApiRow[] = useMemo(
@@ -141,7 +143,7 @@ export function AiTabs({
   function handleApiSort(key: string) {
     const k = key as "provider" | "score" | "monthly";
     setApiSort((prev) => nextSortState(prev, k));
-    setApiExpanded(false);
+    setApiVisibleCount(STEP);
   }
 
   // サブスクソート
@@ -256,7 +258,7 @@ export function AiTabs({
                   <tr
                     key={r.model.id}
                     className={`hover:bg-[rgba(0,0,0,.015)] transition-colors${
-                      !apiExpanded && i >= 10 ? " api-hidden" : ""
+                      i >= apiVisibleCount ? " api-hidden" : ""
                     }${apiGaps.has(i) ? " provider-gap" : ""}`}
                     data-score={r.score.toFixed(1)}
                     data-provider={r.model.provider}
@@ -328,7 +330,7 @@ export function AiTabs({
                 key={r.model.id}
                 className={`sp-card bg-surface border-b border-border py-2 px-3 flex items-center gap-2.5${
                   i === 0 ? " border-t border-t-border" : ""
-                }${!apiExpanded && i >= 10 ? " api-hidden-sp" : ""}${
+                }${i >= apiVisibleCount ? " api-hidden-sp" : ""}${
                   apiGaps.has(i) ? " provider-gap" : ""
                 }`}
                 data-score={r.score.toFixed(1)}
@@ -364,14 +366,18 @@ export function AiTabs({
             ))}
           </div>
 
-          {models.length > 10 && (
+          {apiVisibleCount < sortedApiRows.length && (
             <button
               type="button"
               className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
               id="api-more"
-              onClick={() => setApiExpanded((prev) => !prev)}
+              onClick={() =>
+                setApiVisibleCount((prev) =>
+                  Math.min(prev + STEP, sortedApiRows.length),
+                )
+              }
             >
-              {apiExpanded ? "- 閉じる" : "+ もっと見る"}
+              + もっと見る
             </button>
           )}
         </div>

@@ -74,50 +74,83 @@ describe("SecurityTabs", () => {
     });
   });
 
-  describe("もっと見る（脆弱性）", () => {
+  describe("もっと見る・段階追加（脆弱性）", () => {
     it("11件目以降が非表示", async () => {
       const user = userEvent.setup();
-      render(<SecurityTabs {...defaultProps} />);
+      render(<SecurityTabs {...defaultProps} vulns={makeVulns(25)} />);
 
       await user.click(screen.getByRole("button", { name: "脆弱性" }));
 
       const panel = document.getElementById("tab-vulns");
       const hidden = panel?.querySelectorAll(".vuln-hidden") ?? [];
-      expect(hidden.length).toBe(2); // 12件中2件非表示
+      expect(hidden.length).toBe(15); // 25件中15件非表示
     });
 
-    it("「もっと見る」クリックで全件表示", async () => {
+    it("「もっと見る」クリックで10件ずつ追加", async () => {
       const user = userEvent.setup();
-      render(<SecurityTabs {...defaultProps} />);
+      render(<SecurityTabs {...defaultProps} vulns={makeVulns(25)} />);
 
       await user.click(screen.getByRole("button", { name: "脆弱性" }));
 
-      // 脆弱性タブ内の「もっと見る」
       const moreBtn = document.getElementById("vuln-more");
       await user.click(moreBtn!);
+
+      // 1回クリック: 20件表示、5件非表示
+      const panel = document.getElementById("tab-vulns");
+      const hidden = panel?.querySelectorAll(".vuln-hidden") ?? [];
+      expect(hidden.length).toBe(5);
+    });
+
+    it("全件表示でボタンが消える", async () => {
+      const user = userEvent.setup();
+      render(<SecurityTabs {...defaultProps} vulns={makeVulns(25)} />);
+
+      await user.click(screen.getByRole("button", { name: "脆弱性" }));
+
+      // 2回クリックで全件表示
+      await user.click(document.getElementById("vuln-more")!);
+      await user.click(document.getElementById("vuln-more")!);
 
       const panel = document.getElementById("tab-vulns");
       const hidden = panel?.querySelectorAll(".vuln-hidden") ?? [];
       expect(hidden.length).toBe(0);
+
+      // ボタンが消えている
+      expect(document.getElementById("vuln-more")).toBeNull();
     });
   });
 
-  describe("もっと見る（アップデート）", () => {
-    it("独立して動作する", async () => {
+  describe("もっと見る・段階追加（アップデート）", () => {
+    it("独立して動作し10件ずつ追加", async () => {
       const user = userEvent.setup();
-      render(<SecurityTabs {...defaultProps} />);
+      render(<SecurityTabs {...defaultProps} rels={makeReleases(25)} />);
 
       await user.click(screen.getByRole("button", { name: "アップデート" }));
 
       const panel = document.getElementById("tab-updates");
       const hidden = panel?.querySelectorAll(".update-hidden") ?? [];
-      expect(hidden.length).toBe(2);
+      expect(hidden.length).toBe(15);
 
-      const moreBtn = document.getElementById("update-more");
-      await user.click(moreBtn!);
+      await user.click(document.getElementById("update-more")!);
 
       const hiddenAfter = panel?.querySelectorAll(".update-hidden") ?? [];
-      expect(hiddenAfter.length).toBe(0);
+      expect(hiddenAfter.length).toBe(5);
+    });
+
+    it("全件表示でボタンが消える", async () => {
+      const user = userEvent.setup();
+      render(<SecurityTabs {...defaultProps} rels={makeReleases(25)} />);
+
+      await user.click(screen.getByRole("button", { name: "アップデート" }));
+
+      await user.click(document.getElementById("update-more")!);
+      await user.click(document.getElementById("update-more")!);
+
+      const panel = document.getElementById("tab-updates");
+      const hidden = panel?.querySelectorAll(".update-hidden") ?? [];
+      expect(hidden.length).toBe(0);
+
+      expect(document.getElementById("update-more")).toBeNull();
     });
   });
 
