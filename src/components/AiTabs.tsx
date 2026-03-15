@@ -15,7 +15,8 @@ type SubscriptionPlan = InferSelectModel<typeof subscriptionPlans>;
 type AiTabsProps = {
   models: LlmModel[];
   plans: SubscriptionPlan[];
-  commentText: string | null;
+  apiCommentText: string | null;
+  subCommentText: string | null;
   providerDotClass: Record<string, string>;
 };
 
@@ -38,7 +39,8 @@ type SubRow = {
 export function AiTabs({
   models,
   plans,
-  commentText,
+  apiCommentText,
+  subCommentText,
   providerDotClass,
 }: AiTabsProps) {
   const [activeTab, setActiveTab] = useState<"text" | "sub">("text");
@@ -556,14 +558,14 @@ export function AiTabs({
         </div>
 
         {/* 付箋 */}
-        {commentText && (
+        {(activeTab === "text" ? apiCommentText : subCommentText) && (
           <div className="mt-7 flex justify-center">
             <div className="relative w-full max-w-150 p-5 pb-6.5 bg-sticky-4 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
               <div className="font-mono text-[10px] tracking-[.08em] text-sticky-ink opacity-50 mb-2">
-                GAL SUMMARY
+                SUMMARY
               </div>
               <div className="text-[12.5px] leading-[1.9] text-sticky-ink">
-                {commentText}
+                {activeTab === "text" ? apiCommentText : subCommentText}
               </div>
               <div className="sticky-fold max-md:hidden" />
             </div>
