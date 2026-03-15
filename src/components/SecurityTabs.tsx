@@ -15,7 +15,6 @@ type SecurityTabsProps = {
   rels: Release[];
   repoMap: Record<string, RepoInfo>;
   dailyComment: string | null;
-  displayDate: string;
 };
 
 function formatDate(dateStr: string): string {
@@ -29,7 +28,6 @@ export function SecurityTabs({
   rels,
   repoMap,
   dailyComment,
-  displayDate,
 }: SecurityTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("summary");
   const [vulnExpanded, setVulnExpanded] = useState(false);
@@ -46,32 +44,24 @@ export function SecurityTabs({
 
   return (
     <>
-      {/* 日付 */}
-      <div className="relative z-1 max-w-265 mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5">
-        <div className="font-mono text-[11px] text-muted tracking-[.06em]">
-          {displayDate}
+      <main className="relative z-1 max-w-265 mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
+        {/* タブバー */}
+        <div className="flex gap-0 border-b border-border mb-0">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`tab-btn text-[13px] font-medium bg-transparent border-none border-b-2 px-5 py-3 cursor-pointer transition-all whitespace-nowrap ${
+                activeTab === tab.id
+                  ? "active text-ink border-b-ink"
+                  : "text-muted border-b-transparent hover:text-ink"
+              }`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </div>
-
-      {/* タブバー */}
-      <div className="relative z-1 max-w-265 mx-auto flex gap-0 px-10 pt-4 border-b border-border max-md:px-4 max-md:pt-3">
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            className={`tab-btn font-mono text-[11px] tracking-[.06em] bg-transparent border-none border-b-2 px-5 py-2 pb-3 cursor-pointer transition-all ${
-              activeTab === tab.id
-                ? "active text-ink font-medium border-b-ink"
-                : "text-muted border-b-transparent hover:text-ink"
-            }`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <main className="relative z-1 max-w-265 mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
         {/* TAB 1: 日次サマリー */}
         <div
           id="tab-summary"

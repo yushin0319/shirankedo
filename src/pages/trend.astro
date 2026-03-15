@@ -5,6 +5,7 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { trackingRepos, repoStats, pageComments } from "../db/schema";
 import { isNewRepo } from "../lib/trend";
+import { formatDisplayDate } from "../lib/date";
 
 const db = getDb(env.DB);
 
@@ -56,20 +57,7 @@ const comment = await db
 
 const trendComment = comment[0]?.content ?? null;
 
-// 週番号・日付範囲の計算
 const now = new Date();
-const startOfYear = new Date(now.getFullYear(), 0, 1);
-const dayOfYear = Math.floor((now.getTime() - startOfYear.getTime()) / 86400000);
-const weekNum = Math.ceil((dayOfYear + startOfYear.getDay() + 1) / 7);
-
-// 今週の月曜～日曜
-const dayOfWeek = now.getDay();
-const monday = new Date(now);
-monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
-const sunday = new Date(monday);
-sunday.setDate(monday.getDate() + 6);
-const fmt = (d: Date) => `${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-const weekLabel = `${now.getFullYear()} / W${weekNum} (${fmt(monday)} - ${fmt(sunday)})`;
 
 ---
 
@@ -78,7 +66,7 @@ const weekLabel = `${now.getFullYear()} / W${weekNum} (${fmt(monday)} - ${fmt(su
 		class="relative z-1 max-w-[1060px] mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5"
 	>
 		<div class="font-mono text-[11px] text-muted tracking-[.06em]">
-			{weekLabel}&nbsp;&middot;&nbsp;Weekly Trend
+			{formatDisplayDate(now.toISOString().slice(0, 10))}
 		</div>
 	</div>
 	<main class="relative z-1 max-w-[1060px] mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
@@ -119,9 +107,7 @@ const weekLabel = `${now.getFullYear()} / W${weekNum} (${fmt(monday)} - ${fmt(su
 								<td class="py-3.5 px-4 align-middle">
 									<span class="text-[13px] font-bold text-ink">{r.displayName}</span>
 									{isNew && (
-										<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-px rounded-sm bg-accent text-white font-medium ml-2 align-middle">
-											NEW
-										</span>
+										<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-0.5 rounded-sm bg-accent text-white font-medium ml-2 align-middle">NEW</span>
 									)}
 									{r.description && (
 										<span class="text-[11px] text-muted ml-2">{r.description}</span>
@@ -171,9 +157,7 @@ const weekLabel = `${now.getFullYear()} / W${weekNum} (${fmt(monday)} - ${fmt(su
 						<div class="text-[14px] font-bold text-ink mb-1 flex items-center flex-wrap gap-1">
 							{r.displayName}
 							{isNew && (
-								<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-px rounded-sm bg-accent text-white font-medium ml-1">
-									NEW
-								</span>
+								<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-0.5 rounded-sm bg-accent text-white font-medium ml-1">NEW</span>
 							)}
 						</div>
 						{r.description && <div class="text-[11.5px] text-muted leading-[1.6] mb-2.5">{r.description}</div>}

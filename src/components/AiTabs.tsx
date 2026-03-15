@@ -148,28 +148,9 @@ export function AiTabs({
     setSubSort((prev) => nextSortState(prev, k));
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-
   return (
     <>
-      {/* 日付 */}
-      <div className="relative z-1 max-w-265 mx-auto px-10 pt-6 pb-0 max-md:px-4 max-md:pt-4">
-        <div className="font-mono text-[11px] text-muted tracking-[.06em]">
-          Weekly Compare&nbsp;&middot;&nbsp;{today}
-        </div>
-      </div>
-
       <main className="relative z-1 max-w-265 mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
-        {/* セクション見出し */}
-        <div className="mt-7 mb-4.5">
-          <h2 className="text-[17px] font-bold tracking-[-0.01em]">AI比較</h2>
-          <div className="h-px bg-border my-2" />
-          <span className="font-mono text-[10px] text-muted tracking-[.06em]">
-            API
-            pricing&nbsp;&middot;&nbsp;benchmarks&nbsp;&middot;&nbsp;subscriptions
-          </span>
-        </div>
-
         {/* タブバー */}
         <div className="flex gap-0 border-b border-border mb-0">
           <button
