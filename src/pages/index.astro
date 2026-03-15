@@ -79,7 +79,6 @@ const today = new Date().toISOString().slice(0, 10);
 		const batch = Array.from(hiddenItems).slice(visible, visible + STEP);
 		for (const item of batch) {
 			item.classList.remove("news-hidden");
-			item.style.display = "";
 		}
 		visible += batch.length;
 		if (visible >= hiddenItems.length) {
