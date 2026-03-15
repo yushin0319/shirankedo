@@ -8,5 +8,6 @@ declare module "cloudflare:workers" {
   const env: {
     DB: D1Database;
     KV: KVNamespace;
+    INGEST_API_KEY: string;
   };
 }
