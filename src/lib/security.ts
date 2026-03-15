@@ -1,17 +1,17 @@
-type RepoInfo = { displayName: string; description: string | null };
+export type RepoInfo = { displayName: string; description: string | null };
 
 // リリースの表示名を解決: tracking_reposにあればdisplay_name、なければrepoスラッグ
 export function resolveReleaseName(
   repo: string,
-  repoMap: Map<string, RepoInfo>,
+  repoMap: Record<string, RepoInfo>,
 ): string {
-  return repoMap.get(repo)?.displayName ?? repo;
+  return repoMap[repo]?.displayName ?? repo;
 }
 
 // リリースの説明文を解決: tracking_reposにあればdescription、なければnull
 export function resolveReleaseDescription(
   repo: string,
-  repoMap: Map<string, RepoInfo>,
+  repoMap: Record<string, RepoInfo>,
 ): string | null {
-  return repoMap.get(repo)?.description ?? null;
+  return repoMap[repo]?.description ?? null;
 }

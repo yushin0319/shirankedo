@@ -1,0 +1,140 @@
+/* AI比較ページ用スタイル（React Island から参照） */
+
+.ai-tab-panel.hidden {
+  display: none;
+}
+.api-hidden {
+  display: none;
+}
+.api-hidden-sp {
+  display: none;
+}
+
+/* プロバイダードット（20色） */
+.provider-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.dot-openai {
+  background: #10a37f;
+}
+.dot-anthropic {
+  background: #d97706;
+}
+.dot-google {
+  background: #4285f4;
+}
+.dot-deepseek {
+  background: #6366f1;
+}
+.dot-xai {
+  background: #1a1a1a;
+}
+.dot-meta {
+  background: #0668e1;
+}
+.dot-mistral {
+  background: #ff7000;
+}
+.dot-bfl {
+  background: #e44d26;
+}
+.dot-midjourney {
+  background: #5865f2;
+}
+.dot-ideogram {
+  background: #ff6b35;
+}
+.dot-stability {
+  background: #a855f7;
+}
+.dot-perplexity {
+  background: #20808d;
+}
+.dot-recraft {
+  background: #ef4444;
+}
+.dot-alibaba {
+  background: #ff6a00;
+}
+.dot-moonshot {
+  background: #6c5ce7;
+}
+.dot-minimax {
+  background: #00b894;
+}
+.dot-zhipu {
+  background: #3b82f6;
+}
+.dot-xiaomi {
+  background: #ff6900;
+}
+.dot-amazon {
+  background: #ff9900;
+}
+.dot-microsoft {
+  background: #00a4ef;
+}
+
+/* ベンチマークバー */
+.bench-bar {
+  height: 6px;
+  border-radius: 1px;
+  min-width: 2px;
+  background: var(--color-border);
+}
+.bench-bar.tier-s,
+.bench-bar.tier-a,
+.bench-bar.tier-b,
+.bench-bar.tier-c {
+  background: var(--color-accent);
+}
+
+/* ソート可能ヘッダー */
+th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+th[data-sort]:hover {
+  color: var(--color-ink);
+}
+th[data-sort]::after {
+  content: " ↕";
+  font-size: 8px;
+  opacity: 0.4;
+}
+th[data-sort].sort-asc::after {
+  content: " ↑";
+  opacity: 0.7;
+}
+th[data-sort].sort-desc::after {
+  content: " ↓";
+  opacity: 0.7;
+}
+
+/* プロバイダー間ギャップ */
+tr.provider-gap td {
+  border-top: 2px solid var(--color-border);
+  padding-top: 14px;
+}
+.sp-card.provider-gap,
+.sub-sp-card.provider-gap {
+  margin-top: 12px;
+  border-top: 2px solid var(--color-border);
+  padding-top: 12px;
+}
+
+.sticky-fold {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 22px 22px;
+  border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
+}

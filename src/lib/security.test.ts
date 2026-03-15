@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveReleaseDescription, resolveReleaseName } from "./security";
 
 describe("resolveReleaseName", () => {
-  const repoMap = new Map([
+  const repoMap = Object.fromEntries([
     [
       "tensorflow/tensorflow",
       { displayName: "TensorFlow", description: "機械学習フレームワーク" },
@@ -11,7 +11,7 @@ describe("resolveReleaseName", () => {
       "shadcn-ui/ui",
       { displayName: "shadcn/ui", description: "UIコンポーネントライブラリ" },
     ],
-  ]);
+  ]) as Record<string, { displayName: string; description: string | null }>;
 
   it("tracking_reposにマッチする場合、display_nameを返す", () => {
     expect(resolveReleaseName("tensorflow/tensorflow", repoMap)).toBe(
@@ -26,7 +26,7 @@ describe("resolveReleaseName", () => {
 });
 
 describe("resolveReleaseDescription", () => {
-  const repoMap = new Map([
+  const repoMap = Object.fromEntries([
     [
       "tensorflow/tensorflow",
       { displayName: "TensorFlow", description: "機械学習フレームワーク" },
@@ -35,7 +35,7 @@ describe("resolveReleaseDescription", () => {
       "rust-lang/rust",
       { displayName: "Rust", description: null as string | null },
     ],
-  ]);
+  ]) as Record<string, { displayName: string; description: string | null }>;
 
   it("tracking_reposにdescriptionがある場合、それを返す", () => {
     expect(resolveReleaseDescription("tensorflow/tensorflow", repoMap)).toBe(
