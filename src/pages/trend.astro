@@ -44,8 +44,7 @@ const ranked = repos
 			diff: stats?.diff ?? 0,
 		};
 	})
-	.sort((a, b) => b.diff - a.diff)
-	.slice(0, 20);
+	.sort((a, b) => b.diff - a.diff);
 
 // トレンドコメント
 const comment = await db
@@ -77,7 +76,7 @@ const now = new Date();
 			</h2>
 			<div class="flex-1 h-px bg-border"></div>
 			<span class="font-mono text-[10px] text-muted tracking-[.06em] whitespace-nowrap">
-				top {ranked.length} by weekly delta
+				{ranked.length} repos by weekly delta
 			</span>
 		</div>
 
@@ -205,14 +204,8 @@ const now = new Date();
 	.trend-hidden {
 		display: none;
 	}
-	.show-all-trend .trend-hidden {
-		display: table-row;
-	}
 	.trend-hidden-sp {
 		display: none;
-	}
-	.show-all-trend-sp .trend-hidden-sp {
-		display: block;
 	}
 	.sticky-fold {
 		position: absolute;
@@ -227,33 +220,27 @@ const now = new Date();
 </style>
 
 <script>
-	// PC: もっと見る
+	const STEP = 10;
+
+	// PC: もっと見る（10件ずつ追加）
 	const trendMore = document.getElementById("trend-more");
-	const trendTbody = document.getElementById("trend-tbody");
-	let trendExpanded = false;
+	const trendRows = document.querySelectorAll<HTMLElement>("#trend-tbody tr.trend-hidden");
+	let pcVisible = 0;
 	trendMore?.addEventListener("click", () => {
-		trendExpanded = !trendExpanded;
-		if (trendExpanded) {
-			trendTbody?.closest("div")?.classList.add("show-all-trend");
-			trendMore.textContent = "- 閉じる";
-		} else {
-			trendTbody?.closest("div")?.classList.remove("show-all-trend");
-			trendMore.textContent = "+ もっと見る";
-		}
+		const batch = Array.from(trendRows).slice(pcVisible, pcVisible + STEP);
+		for (const row of batch) row.style.display = "table-row";
+		pcVisible += batch.length;
+		if (pcVisible >= trendRows.length) trendMore.style.display = "none";
 	});
 
-	// SP: もっと見る
+	// SP: もっと見る（10件ずつ追加）
 	const trendMoreSp = document.getElementById("trend-more-sp");
-	const trendCards = document.getElementById("trend-cards");
-	let trendExpandedSp = false;
+	const trendCardItems = document.querySelectorAll<HTMLElement>("#trend-cards .trend-hidden-sp");
+	let spVisible = 0;
 	trendMoreSp?.addEventListener("click", () => {
-		trendExpandedSp = !trendExpandedSp;
-		if (trendExpandedSp) {
-			trendCards?.classList.add("show-all-trend-sp");
-			trendMoreSp.textContent = "- 閉じる";
-		} else {
-			trendCards?.classList.remove("show-all-trend-sp");
-			trendMoreSp.textContent = "+ もっと見る";
-		}
+		const batch = Array.from(trendCardItems).slice(spVisible, spVisible + STEP);
+		for (const card of batch) card.style.display = "block";
+		spVisible += batch.length;
+		if (spVisible >= trendCardItems.length) trendMoreSp.style.display = "none";
 	});
 </script>

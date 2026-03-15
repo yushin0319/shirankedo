@@ -4,9 +4,9 @@
 
 ## スタック
 
-- Astro SSR + React Islands（CF Pages）
+- Astro SSR + React Islands（CF Workers）
 - Tailwind CSS v4 / Zod / Drizzle ORM（D1ドライバー）
-- CF D1 + CF KV + CF Pages
+- CF D1 + CF KV + CF Workers
 - AI: Gemini 2.5 Flash（選定） + Gemini 3 Flash Preview（要約）
 - 自動化: n8n Cron 2本（日次 0:00 JST + 週次 月曜 3:00 JST）
 
@@ -36,8 +36,9 @@
 
 ## デプロイ
 
-- **本番URL**: （CF Pages デプロイ後に記載）
-- **デプロイ方法**: main push → CF Pages 自動デプロイ
+- **本番URL**: https://shirankedo.y-fudo.workers.dev/
+- **デプロイ方法**: `npm run build && npx wrangler deploy`
+- **自動デプロイ**: 未設定（#334 で CI 化予定）
 
 ## 設計ドキュメント
 
