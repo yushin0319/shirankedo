@@ -1,6 +1,7 @@
 // テスト用: better-sqlite3 で in-memory DB を作り、Drizzle を返す
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import type { AppDatabase } from "./client";
 import * as schema from "./schema";
 
 /** 全テーブルの CREATE TABLE SQL */
@@ -131,5 +132,7 @@ export function createTestDb() {
 export function createTestDbWithTables() {
   const { db, sqlite } = createTestDb();
   sqlite.exec(CREATE_TABLES_SQL);
-  return { db, sqlite };
+  // BetterSQLite3Database と DrizzleD1Database はクエリ API 互換
+  // batch() はテストで使わないため安全にキャスト
+  return { db: db as unknown as AppDatabase, sqlite };
 }
