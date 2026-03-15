@@ -5,6 +5,7 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { vulnerabilities, releases, securityDaily, trackingRepos } from "../db/schema";
 import { SecurityTabs } from "../components/SecurityTabs";
+import { formatDisplayDate } from "../lib/date";
 
 const db = getDb(env.DB);
 
@@ -35,7 +36,7 @@ const repoMap = Object.fromEntries(
 );
 
 const today = new Date().toISOString().slice(0, 10);
-const displayDate = `${today.slice(0, 4)} / ${today.slice(5, 7)} / ${today.slice(8, 10)}`;
+const displayDate = formatDisplayDate(today);
 ---
 
 <Layout title="セキュリティ" currentPage="security">
