@@ -1,9 +1,9 @@
 import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 import { z } from "zod";
-import { getDb } from "../../../db/client";
-import { jsonError, jsonOk, verifyApiKey } from "../../../lib/api/auth";
-import { processVulnerabilities } from "../../../lib/api/ingest-upsert";
+import { getDb } from "../../../../db/client";
+import { jsonError, jsonOk, verifyApiKey } from "../../../../lib/api/auth";
+import { processVulnerabilities } from "../../../../lib/api/ingest-upsert";
 
 export const POST: APIRoute = async ({ request }) => {
   if (!verifyApiKey(request, env.INGEST_API_KEY)) {
