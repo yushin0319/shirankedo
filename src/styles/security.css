@@ -1,0 +1,22 @@
+/* セキュリティページ用スタイル（React Island から参照） */
+
+.tab-content.hidden {
+  display: none;
+}
+.vuln-hidden {
+  display: none;
+}
+.update-hidden {
+  display: none;
+}
+
+.sticky-fold {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 0 0 22px 22px;
+  border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
+}

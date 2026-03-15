@@ -4,7 +4,7 @@ import { desc } from "drizzle-orm";
 import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { vulnerabilities, releases, securityDaily, trackingRepos } from "../db/schema";
-import { resolveReleaseName, resolveReleaseDescription } from "../lib/security";
+import { SecurityTabs } from "../components/SecurityTabs";
 
 const db = getDb(env.DB);
 
@@ -28,295 +28,27 @@ const rels = await db
 
 const dailyComment = daily[0]?.comment ?? null;
 
-// tracking_reposから表示名・説明を取得
+// tracking_reposから表示名・説明を取得（Record に変換）
 const repos = await db.select().from(trackingRepos);
-const repoMap = new Map(repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }]));
-
-// サマリー用: 脆弱性TOP5, アップデートTOP5
-const vulnTop5 = vulns.slice(0, 5);
-const relTop5 = rels.slice(0, 5);
+const repoMap = Object.fromEntries(
+	repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }])
+);
 
 const today = new Date().toISOString().slice(0, 10);
 const displayDate = `${today.slice(0, 4)} / ${today.slice(5, 7)} / ${today.slice(8, 10)}`;
-
-function formatDate(dateStr: string): string {
-	return dateStr.slice(5).replace("-", "/");
-}
-
 ---
 
 <Layout title="セキュリティ" currentPage="security">
-	<div
-		class="relative z-1 max-w-[1060px] mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5"
-	>
-		<div class="font-mono text-[11px] text-muted tracking-[.06em]">
-			{displayDate}
-		</div>
-	</div>
-
-	{/* タブバー */}
-	<div class="relative z-1 max-w-[1060px] mx-auto flex gap-0 px-10 pt-4 border-b border-border max-md:px-4 max-md:pt-3">
-		<button
-			class="tab-btn font-mono text-[11px] tracking-[.06em] text-ink font-medium bg-transparent border-none border-b-2 border-b-ink px-5 py-2 pb-3 cursor-pointer transition-all active"
-			data-tab="summary"
-		>
-			日次サマリー
-		</button>
-		<button
-			class="tab-btn font-mono text-[11px] tracking-[.06em] text-muted bg-transparent border-none border-b-2 border-b-transparent px-5 py-2 pb-3 cursor-pointer transition-all hover:text-ink"
-			data-tab="vulns"
-		>
-			脆弱性
-		</button>
-		<button
-			class="tab-btn font-mono text-[11px] tracking-[.06em] text-muted bg-transparent border-none border-b-2 border-b-transparent px-5 py-2 pb-3 cursor-pointer transition-all hover:text-ink"
-			data-tab="updates"
-		>
-			アップデート
-		</button>
-	</div>
-
-	<main class="relative z-1 max-w-[1060px] mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
-
-		{/* ==================== TAB 1: 日次サマリー ==================== */}
-		<div id="tab-summary" class="tab-content">
-			{/* 脆弱性 TOP5 */}
-			<div class="flex items-center gap-2.5 mb-4 mt-2">
-				<h2 class="font-mono text-xs font-medium tracking-[.08em] text-ink whitespace-nowrap">脆弱性</h2>
-				<div class="flex-1 h-px bg-border"></div>
-				<span class="font-mono text-[10px] text-muted tracking-[.06em] whitespace-nowrap">CVSS x recency</span>
-			</div>
-
-			{vulnTop5.map((v) => (
-				<div class="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)]">
-					<div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-critical"></div>
-					<div class="flex-1 min-w-0">
-						<div class="text-[13px] font-bold text-ink leading-[1.5]">{v.title}</div>
-						<div class="font-mono text-[10px] text-muted mt-0.5">
-							{v.cveId}&nbsp;&middot;&nbsp;CVSS {v.cvssScore?.toFixed(1) ?? "—"}&nbsp;&middot;&nbsp;{formatDate(v.publishedAt)}
-						</div>
-					</div>
-				</div>
-			))}
-
-			{/* アップデート TOP5 */}
-			<div class="flex items-center gap-2.5 mb-4 mt-7">
-				<h2 class="font-mono text-xs font-medium tracking-[.08em] text-ink whitespace-nowrap">アップデート</h2>
-				<div class="flex-1 h-px bg-border"></div>
-				<span class="font-mono text-[10px] text-muted tracking-[.06em] whitespace-nowrap">stars x recency</span>
-			</div>
-
-			{relTop5.map((r) => {
-				const isMajor = r.type === "major";
-				const name = resolveReleaseName(r.repo, repoMap);
-				const desc = resolveReleaseDescription(r.repo, repoMap);
-				return (
-					<div class="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:flex-col max-md:items-start max-md:gap-1.5 max-md:px-5">
-						{isMajor
-							? <div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-major"></div>
-							: <div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-sec-green"></div>
-						}
-						<div class="flex-1 min-w-0">
-							<div class="text-[13px] font-bold text-ink leading-[1.5] flex items-baseline gap-2">
-								{name}
-								{isMajor && (
-									<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-major-bg text-major-text">
-										MAJOR
-									</span>
-								)}
-							</div>
-							<div class="font-mono text-[10px] text-muted mt-0.5">
-								{desc && <>{desc}&nbsp;&middot;&nbsp;</>}{formatDate(r.publishedAt)}
-							</div>
-						</div>
-						{isMajor
-							? <span class="font-mono text-[11px] font-medium px-2.5 py-0.5 rounded-sm tracking-[.04em] shrink-0 whitespace-nowrap bg-major-bg text-major-text">{r.version}</span>
-							: <span class="font-mono text-[11px] font-medium px-2.5 py-0.5 rounded-sm tracking-[.04em] shrink-0 whitespace-nowrap bg-minor-bg text-minor-text">{r.version}</span>
-						}
-					</div>
-				);
-			})}
-
-			{/* ギャルコメント付箋 */}
-			{dailyComment && (
-				<div class="mt-7 flex justify-center">
-					<div class="relative w-full max-w-[600px] p-5 pb-6.5 bg-sticky-5 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
-						<div class="font-mono text-[10px] tracking-[.08em] text-sticky-ink opacity-50 mb-2">
-							TODAY'S SECURITY COMMENT
-						</div>
-						<div class="text-[12.5px] leading-[1.9] text-sticky-ink">
-							{dailyComment}
-						</div>
-						<div class="sticky-fold max-md:hidden"></div>
-					</div>
-				</div>
-			)}
-		</div>
-
-		{/* ==================== TAB 2: 脆弱性 ==================== */}
-		<div id="tab-vulns" class="tab-content hidden">
-			<div class="flex items-center gap-2.5 mb-4 mt-2">
-				<h2 class="font-mono text-xs font-medium tracking-[.08em] text-ink whitespace-nowrap">CRITICAL 脆弱性</h2>
-				<div class="flex-1 h-px bg-border"></div>
-				<span class="font-mono text-[10px] text-muted tracking-[.06em] whitespace-nowrap">NVD&nbsp;&middot;&nbsp;CRITICAL only</span>
-			</div>
-
-			{vulns.map((v, i) => (
-				<div class:list={[
-					"vuln-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)]",
-					i >= 10 ? "vuln-hidden" : ""
-				]}>
-					<div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-critical"></div>
-					<div class="flex items-center gap-2.5 mb-2 flex-wrap">
-						<span class="font-mono text-[11px] font-medium text-ink tracking-[.04em]">{v.cveId}</span>
-						{v.cvssScore && (
-							<span class="font-mono text-[10px] tracking-[.04em] text-critical">
-								CVSS {v.cvssScore.toFixed(1)}
-							</span>
-						)}
-						<span class="font-mono text-[10px] text-muted tracking-[.04em]">{formatDate(v.publishedAt)}</span>
-					</div>
-					<div class="text-[14px] font-bold leading-[1.55] text-ink tracking-[-0.01em]">{v.title}</div>
-				</div>
-			))}
-
-			{vulns.length > 10 && (
-				<button
-					class="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
-					id="vuln-more"
-				>
-					+ もっと見る
-				</button>
-			)}
-		</div>
-
-		{/* ==================== TAB 3: アップデート ==================== */}
-		<div id="tab-updates" class="tab-content hidden">
-			<div class="flex items-center gap-2.5 mb-4 mt-2">
-				<h2 class="font-mono text-xs font-medium tracking-[.08em] text-ink whitespace-nowrap">リリース</h2>
-				<div class="flex-1 h-px bg-border"></div>
-				<span class="font-mono text-[10px] text-muted tracking-[.06em] whitespace-nowrap">stable&nbsp;&middot;&nbsp;major + minor</span>
-			</div>
-
-			{rels.map((r, i) => {
-				const isMajor = r.type === "major";
-				const name = resolveReleaseName(r.repo, repoMap);
-				const desc = resolveReleaseDescription(r.repo, repoMap);
-				return (
-					<div class:list={[
-						"update-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:flex-col max-md:items-start max-md:gap-1.5 max-md:px-5",
-						i >= 10 ? "update-hidden" : ""
-					]}>
-						{isMajor
-						? <div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-major"></div>
-						: <div class="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-sec-green"></div>
-					}
-						<div class="flex-1 min-w-0">
-							<div class="text-[14px] font-bold text-ink leading-[1.4] tracking-[-0.01em] flex items-baseline gap-2">
-								{name}
-								{isMajor && (
-									<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-major-bg text-major-text">
-										MAJOR
-									</span>
-								)}
-								<span class="font-mono text-[10px] text-muted font-normal">{formatDate(r.publishedAt)}</span>
-							</div>
-							{desc && (
-								<div class="text-[11px] text-muted mt-0.5">{desc}</div>
-							)}
-						</div>
-						{isMajor
-							? <span class="font-mono text-[11px] font-medium px-2.5 py-0.5 rounded-sm tracking-[.04em] shrink-0 whitespace-nowrap bg-major-bg text-major-text">{r.version}</span>
-							: <span class="font-mono text-[11px] font-medium px-2.5 py-0.5 rounded-sm tracking-[.04em] shrink-0 whitespace-nowrap bg-minor-bg text-minor-text">{r.version}</span>
-						}
-					</div>
-				);
-			})}
-
-			{rels.length > 10 && (
-				<button
-					class="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
-					id="update-more"
-				>
-					+ もっと見る
-				</button>
-			)}
-		</div>
-	</main>
+	<SecurityTabs
+		client:idle
+		vulns={vulns}
+		rels={rels}
+		repoMap={repoMap}
+		dailyComment={dailyComment}
+		displayDate={displayDate}
+	/>
 </Layout>
 
-<style>
-	.tab-content.hidden {
-		display: none;
-	}
-	.vuln-hidden {
-		display: none;
-	}
-	.show-all-vuln .vuln-hidden {
-		display: block;
-	}
-	.update-hidden {
-		display: none;
-	}
-	.show-all-update .update-hidden {
-		display: block;
-	}
-	.sticky-fold {
-		position: absolute;
-		bottom: 0;
-		right: 0;
-		width: 0;
-		height: 0;
-		border-style: solid;
-		border-width: 0 0 22px 22px;
-		border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
-	}
+<style is:global>
+	@import "../styles/security.css";
 </style>
-
-<script>
-	// タブ切り替え
-	document.querySelectorAll(".tab-btn").forEach((btn) => {
-		btn.addEventListener("click", () => {
-			document.querySelectorAll(".tab-btn").forEach((b) => {
-				b.classList.remove("active", "text-ink", "font-medium", "border-b-ink");
-				b.classList.add("text-muted", "border-b-transparent");
-			});
-			btn.classList.add("active", "text-ink", "font-medium", "border-b-ink");
-			btn.classList.remove("text-muted", "border-b-transparent");
-
-			document.querySelectorAll(".tab-content").forEach((c) => c.classList.add("hidden"));
-			const tabId = (btn as HTMLElement).dataset.tab;
-			document.getElementById("tab-" + tabId)?.classList.remove("hidden");
-		});
-	});
-
-	// 脆弱性: もっと見る
-	const vulnMore = document.getElementById("vuln-more");
-	let vulnExpanded = false;
-	vulnMore?.addEventListener("click", () => {
-		vulnExpanded = !vulnExpanded;
-		const tab = document.getElementById("tab-vulns");
-		if (vulnExpanded) {
-			tab?.classList.add("show-all-vuln");
-			vulnMore.textContent = "- 閉じる";
-		} else {
-			tab?.classList.remove("show-all-vuln");
-			vulnMore.textContent = "+ もっと見る";
-		}
-	});
-
-	// アップデート: もっと見る
-	const updateMore = document.getElementById("update-more");
-	let updateExpanded = false;
-	updateMore?.addEventListener("click", () => {
-		updateExpanded = !updateExpanded;
-		const tab = document.getElementById("tab-updates");
-		if (updateExpanded) {
-			tab?.classList.add("show-all-update");
-			updateMore.textContent = "- 閉じる";
-		} else {
-			tab?.classList.remove("show-all-update");
-			updateMore.textContent = "+ もっと見る";
-		}
-	});
-</script>
