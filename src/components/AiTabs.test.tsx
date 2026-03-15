@@ -86,7 +86,7 @@ describe("AiTabs", () => {
     it("11件目以降が非表示", () => {
       render(<AiTabs {...defaultProps} />);
       const tbody = document.getElementById("api-tbody");
-      const rows = tbody?.querySelectorAll("tr");
+      const rows = tbody?.querySelectorAll("tr") ?? [];
       const visibleRows = Array.from(rows).filter(
         (r) => !r.classList.contains("api-hidden"),
       );

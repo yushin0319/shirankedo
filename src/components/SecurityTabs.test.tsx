@@ -83,7 +83,7 @@ describe("SecurityTabs", () => {
       await user.click(screen.getByRole("button", { name: "脆弱性" }));
 
       const panel = document.getElementById("tab-vulns");
-      const hidden = panel?.querySelectorAll(".vuln-hidden");
+      const hidden = panel?.querySelectorAll(".vuln-hidden") ?? [];
       expect(hidden.length).toBe(2); // 12件中2件非表示
     });
 
@@ -98,7 +98,7 @@ describe("SecurityTabs", () => {
       await user.click(moreBtn!);
 
       const panel = document.getElementById("tab-vulns");
-      const hidden = panel?.querySelectorAll(".vuln-hidden");
+      const hidden = panel?.querySelectorAll(".vuln-hidden") ?? [];
       expect(hidden.length).toBe(0);
     });
   });
@@ -111,13 +111,13 @@ describe("SecurityTabs", () => {
       await user.click(screen.getByRole("button", { name: "アップデート" }));
 
       const panel = document.getElementById("tab-updates");
-      const hidden = panel?.querySelectorAll(".update-hidden");
+      const hidden = panel?.querySelectorAll(".update-hidden") ?? [];
       expect(hidden.length).toBe(2);
 
       const moreBtn = document.getElementById("update-more");
       await user.click(moreBtn!);
 
-      const hiddenAfter = panel?.querySelectorAll(".update-hidden");
+      const hiddenAfter = panel?.querySelectorAll(".update-hidden") ?? [];
       expect(hiddenAfter.length).toBe(0);
     });
   });
