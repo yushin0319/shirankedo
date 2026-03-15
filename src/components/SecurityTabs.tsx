@@ -47,14 +47,14 @@ export function SecurityTabs({
   return (
     <>
       {/* 日付 */}
-      <div className="relative z-1 max-w-[1060px] mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5">
+      <div className="relative z-1 max-w-265 mx-auto px-10 pt-7 pb-0 flex items-baseline justify-between max-md:px-4 max-md:pt-5">
         <div className="font-mono text-[11px] text-muted tracking-[.06em]">
           {displayDate}
         </div>
       </div>
 
       {/* タブバー */}
-      <div className="relative z-1 max-w-[1060px] mx-auto flex gap-0 px-10 pt-4 border-b border-border max-md:px-4 max-md:pt-3">
+      <div className="relative z-1 max-w-265 mx-auto flex gap-0 px-10 pt-4 border-b border-border max-md:px-4 max-md:pt-3">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -71,7 +71,7 @@ export function SecurityTabs({
         ))}
       </div>
 
-      <main className="relative z-1 max-w-[1060px] mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
+      <main className="relative z-1 max-w-265 mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
         {/* TAB 1: 日次サマリー */}
         <div
           id="tab-summary"
@@ -93,9 +93,9 @@ export function SecurityTabs({
               key={v.id}
               className="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)]"
             >
-              <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-critical" />
+              <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-critical" />
               <div className="flex-1 min-w-0">
-                <div className="text-[13px] font-bold text-ink leading-[1.5]">
+                <div className="text-[13px] font-bold text-ink leading-normal">
                   {v.title}
                 </div>
                 <div className="font-mono text-[10px] text-muted mt-0.5">
@@ -128,12 +128,12 @@ export function SecurityTabs({
                 className="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:flex-col max-md:items-start max-md:gap-1.5 max-md:px-5"
               >
                 {isMajor ? (
-                  <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-major" />
+                  <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-major" />
                 ) : (
-                  <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-sec-green" />
+                  <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-sec-green" />
                 )}
                 <div className="flex-1 min-w-0">
-                  <div className="text-[13px] font-bold text-ink leading-[1.5] flex items-baseline gap-2">
+                  <div className="text-[13px] font-bold text-ink leading-normal flex items-baseline gap-2">
                     {name}
                     {isMajor && (
                       <span className="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-major-bg text-major-text">
@@ -162,7 +162,7 @@ export function SecurityTabs({
           {/* 付箋コメント */}
           {dailyComment && (
             <div className="mt-7 flex justify-center">
-              <div className="relative w-full max-w-[600px] p-5 pb-6.5 bg-sticky-5 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
+              <div className="relative w-full max-w-150 p-5 pb-6.5 bg-sticky-5 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
                 <div className="font-mono text-[10px] tracking-[.08em] text-sticky-ink opacity-50 mb-2">
                   TODAY'S SECURITY COMMENT
                 </div>
@@ -197,7 +197,7 @@ export function SecurityTabs({
                 !vulnExpanded && i >= 10 ? " vuln-hidden" : ""
               }`}
             >
-              <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-critical" />
+              <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-critical" />
               <div className="flex items-center gap-2.5 mb-2 flex-wrap">
                 <span className="font-mono text-[11px] font-medium text-ink tracking-[.04em]">
                   {v.cveId}
@@ -256,9 +256,9 @@ export function SecurityTabs({
                 }`}
               >
                 {isMajor ? (
-                  <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-major" />
+                  <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-major" />
                 ) : (
-                  <div className="absolute top-0 left-0 w-[3px] h-full rounded-l-sm bg-sec-green" />
+                  <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-sec-green" />
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[14px] font-bold text-ink leading-[1.4] tracking-[-0.01em] flex items-baseline gap-2">

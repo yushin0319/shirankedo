@@ -153,13 +153,13 @@ export function AiTabs({
   return (
     <>
       {/* 日付 */}
-      <div className="relative z-1 max-w-[1060px] mx-auto px-10 pt-6 pb-0 max-md:px-4 max-md:pt-4">
+      <div className="relative z-1 max-w-265 mx-auto px-10 pt-6 pb-0 max-md:px-4 max-md:pt-4">
         <div className="font-mono text-[11px] text-muted tracking-[.06em]">
           Weekly Compare&nbsp;&middot;&nbsp;{today}
         </div>
       </div>
 
-      <main className="relative z-1 max-w-[1060px] mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
+      <main className="relative z-1 max-w-265 mx-auto px-10 pb-20 max-md:px-4 max-md:pb-15">
         {/* セクション見出し */}
         <div className="mt-7 mb-4.5">
           <h2 className="text-[17px] font-bold tracking-[-0.01em]">AI比較</h2>
@@ -203,7 +203,7 @@ export function AiTabs({
         >
           {/* シナリオボックス */}
           <div className="mt-4 flex items-baseline gap-2 flex-wrap">
-            <span className="font-mono text-[9px] tracking-[.1em] text-muted uppercase shrink-0">
+            <span className="font-mono text-[9px] tracking-widest text-muted uppercase shrink-0">
               月額目安 *
             </span>
             <div>
@@ -231,13 +231,13 @@ export function AiTabs({
               <thead>
                 <tr>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "24%" }}
                   >
                     Model
                   </th>
                   <th
-                    className={`font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "provider" ? `sort-${apiSort.dir}` : ""}`}
+                    className={`font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "provider" ? `sort-${apiSort.dir}` : ""}`}
                     style={{ width: "12%" }}
                     data-sort="provider"
                     onClick={() => handleApiSort("provider")}
@@ -245,7 +245,7 @@ export function AiTabs({
                     Provider
                   </th>
                   <th
-                    className={`font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "score" ? `sort-${apiSort.dir}` : ""}`}
+                    className={`font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "score" ? `sort-${apiSort.dir}` : ""}`}
                     style={{ width: "16%" }}
                     data-sort="score"
                     onClick={() => handleApiSort("score")}
@@ -253,13 +253,13 @@ export function AiTabs({
                     Intelligence
                   </th>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "18%" }}
                   >
                     $/1M tok (in/out)
                   </th>
                   <th
-                    className={`font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "monthly" ? `sort-${apiSort.dir}` : ""}`}
+                    className={`font-mono text-[9px] text-muted tracking-widest uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${apiSort.key === "monthly" ? `sort-${apiSort.dir}` : ""}`}
                     style={{ width: "14%" }}
                     data-sort="monthly"
                     onClick={() => handleApiSort("monthly")}
@@ -367,7 +367,7 @@ export function AiTabs({
                       {r.score.toFixed(1)}
                     </span>
                     <div
-                      className={`bench-bar h-[3px] ${r.tier}`}
+                      className={`bench-bar h-0.75 ${r.tier}`}
                       style={{ width: `${Math.round(r.score)}px` }}
                     />
                   </div>
@@ -414,7 +414,7 @@ export function AiTabs({
               <thead>
                 <tr>
                   <th
-                    className={`font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${subSort.key === "provider" ? `sort-${subSort.dir}` : ""}`}
+                    className={`font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${subSort.key === "provider" ? `sort-${subSort.dir}` : ""}`}
                     style={{ width: "12%" }}
                     data-sort="provider"
                     onClick={() => handleSubSort("provider")}
@@ -422,19 +422,19 @@ export function AiTabs({
                     Provider
                   </th>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "12%" }}
                   >
                     Service
                   </th>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "10%" }}
                   >
                     Plan
                   </th>
                   <th
-                    className={`font-mono text-[9px] text-muted tracking-[.1em] uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${subSort.key === "price" ? `sort-${subSort.dir}` : ""}`}
+                    className={`font-mono text-[9px] text-muted tracking-widest uppercase text-right py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap cursor-pointer ${subSort.key === "price" ? `sort-${subSort.dir}` : ""}`}
                     style={{ width: "9%" }}
                     data-sort="price"
                     onClick={() => handleSubSort("price")}
@@ -442,13 +442,13 @@ export function AiTabs({
                     月額
                   </th>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "30%" }}
                   >
                     モデル / 機能
                   </th>
                   <th
-                    className="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
+                    className="font-mono text-[9px] text-muted tracking-widest uppercase text-left py-3.5 px-3.5 border-b border-border bg-surface whitespace-nowrap"
                     style={{ width: "27%" }}
                   >
                     制限・備考
@@ -496,7 +496,7 @@ export function AiTabs({
                         ))}
                       </div>
                     </td>
-                    <td className="py-2.5 px-3.5 border-b border-border align-middle text-[11px] text-muted leading-[1.5]">
+                    <td className="py-2.5 px-3.5 border-b border-border align-middle text-[11px] text-muted leading-normal">
                       {r.plan.limits ?? "—"}
                     </td>
                   </tr>
@@ -565,7 +565,7 @@ export function AiTabs({
                   ))}
                 </div>
                 {r.plan.limits && (
-                  <div className="text-[11px] text-muted leading-[1.5]">
+                  <div className="text-[11px] text-muted leading-normal">
                     {r.plan.limits}
                   </div>
                 )}
@@ -577,7 +577,7 @@ export function AiTabs({
         {/* 付箋 */}
         {commentText && (
           <div className="mt-7 flex justify-center">
-            <div className="relative w-full max-w-[600px] p-5 pb-6.5 bg-sticky-4 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
+            <div className="relative w-full max-w-150 p-5 pb-6.5 bg-sticky-4 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
               <div className="font-mono text-[10px] tracking-[.08em] text-sticky-ink opacity-50 mb-2">
                 GAL SUMMARY
               </div>
