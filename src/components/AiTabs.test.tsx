@@ -100,7 +100,7 @@ describe("AiTabs", () => {
       await user.click(screen.getByText("+ もっと見る"));
 
       const tbody = document.getElementById("api-tbody");
-      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden");
+      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden") ?? [];
       expect(hiddenRows.length).toBe(0);
     });
 
@@ -112,7 +112,7 @@ describe("AiTabs", () => {
       await user.click(screen.getByText("- 閉じる"));
 
       const tbody = document.getElementById("api-tbody");
-      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden");
+      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden") ?? [];
       expect(hiddenRows.length).toBe(2);
     });
   });
@@ -149,7 +149,7 @@ describe("AiTabs", () => {
       await user.click(providerHeader!);
 
       const tbody = document.getElementById("api-tbody");
-      const gapRows = tbody?.querySelectorAll("tr.provider-gap");
+      const gapRows = tbody?.querySelectorAll("tr.provider-gap") ?? [];
       expect(gapRows.length).toBeGreaterThan(0);
     });
   });
