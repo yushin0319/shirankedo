@@ -44,7 +44,8 @@ const providerDotClass: Record<string, string> = {
 const defaultProps = {
   models: makeModels(12),
   plans: makePlans(4),
-  commentText: "テストコメント",
+  apiCommentText: "APIテストコメント",
+  subCommentText: "サブスクテストコメント",
   providerDotClass,
 };
 
@@ -172,14 +173,21 @@ describe("AiTabs", () => {
   });
 
   describe("付箋", () => {
-    it("commentText があるとき表示される", () => {
+    it("API利用タブで apiCommentText が表示される", () => {
       render(<AiTabs {...defaultProps} />);
-      expect(screen.getByText("テストコメント")).toBeInTheDocument();
+      expect(screen.getByText("APIテストコメント")).toBeInTheDocument();
     });
 
-    it("commentText null のとき非表示", () => {
-      render(<AiTabs {...defaultProps} commentText={null} />);
-      expect(screen.queryByText("テストコメント")).not.toBeInTheDocument();
+    it("サブスク比較タブで subCommentText が表示される", async () => {
+      const user = userEvent.setup();
+      render(<AiTabs {...defaultProps} />);
+      await user.click(screen.getByRole("button", { name: "サブスク比較" }));
+      expect(screen.getByText("サブスクテストコメント")).toBeInTheDocument();
+    });
+
+    it("apiCommentText null のとき API利用タブで付箋非表示", () => {
+      render(<AiTabs {...defaultProps} apiCommentText={null} />);
+      expect(screen.queryByText("SUMMARY")).not.toBeInTheDocument();
     });
   });
 });
