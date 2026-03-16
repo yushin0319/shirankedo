@@ -37,6 +37,20 @@ const aiSubComment = await db
 const apiCommentText = aiApiComment[0]?.content ?? null;
 const subCommentText = aiSubComment[0]?.content ?? null;
 
+// KVから為替レートを取得（フォールバック: 150円）
+let jpyPerUsd = 150;
+try {
+	const raw = await env.KV.get("exchange-rate:latest");
+	if (raw) {
+		const parsed = JSON.parse(raw);
+		if (typeof parsed.jpyPerUsd === "number" && parsed.jpyPerUsd > 0) {
+			jpyPerUsd = parsed.jpyPerUsd;
+		}
+	}
+} catch {
+	// KV取得失敗時はデフォルト値を使用
+}
+
 // プロバイダーのドット色（20色）
 const providerDotClass: Record<string, string> = {
 	OpenAI: "dot-openai",
@@ -77,6 +91,7 @@ const providerDotClass: Record<string, string> = {
 		apiCommentText={apiCommentText}
 		subCommentText={subCommentText}
 		providerDotClass={providerDotClass}
+		jpyPerUsd={jpyPerUsd}
 	/>
 </Layout>
 

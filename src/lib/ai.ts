@@ -23,9 +23,10 @@ export function estimateMonthly(
   inputPrice: number,
   outputPrice: number,
   currency: string,
+  jpyPerUsd = 150,
 ): string {
   const usd = inputPrice * 3.6 + outputPrice * 0.6;
   if (currency === "JPY") return `¥${Math.round(usd).toLocaleString()}`;
-  const jpy = usd * 150; // 概算レート
+  const jpy = usd * jpyPerUsd;
   return `¥${Math.round(jpy).toLocaleString()}`;
 }
