@@ -29,10 +29,19 @@ const today = new Date().toISOString().slice(0, 10);
 		</div>
 	</div>
 	<main class="relative z-1 max-w-[1060px] mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
+		<button
+			class="hidden fixed top-16 right-4 z-50 font-mono text-[10px] tracking-[.06em] text-muted bg-surface/80 backdrop-blur-sm border border-border rounded-sm px-3 py-1.5 cursor-pointer transition-all hover:text-ink hover:border-ink"
+			id="filter-reset"
+		>
+			× フィルタ解除
+		</button>
 		<div class="flex flex-col" id="news-list">
 			{
-				rows.map((article, i) => (
-					<div class:list={[{ "news-hidden": i >= 10 }]}>
+				rows.map((article, i) => {
+					const tagsArr = JSON.parse(article.tags) as string[];
+					if (article.isPaper === 1) tagsArr.unshift("PAPER");
+					return (
+					<div class:list={[{ "news-hidden": i >= 10 }]} data-tags={JSON.stringify(tagsArr)}>
 						<NewsCard
 							title={article.title}
 							summary={article.summary}
@@ -45,7 +54,7 @@ const today = new Date().toISOString().slice(0, 10);
 							index={i}
 						/>
 					</div>
-				))
+				);})
 			}
 		</div>
 		{rows.length > 10 && (
@@ -75,8 +84,11 @@ const today = new Date().toISOString().slice(0, 10);
 <script>
 	const STEP = 10;
 	const loadMore = document.getElementById("load-more");
+	const filterReset = document.getElementById("filter-reset");
+	const allCards = document.querySelectorAll<HTMLElement>("#news-list > div");
 	const hiddenItems = document.querySelectorAll<HTMLElement>("#news-list .news-hidden");
 	let visible = 0;
+	let isFiltered = false;
 
 	loadMore?.addEventListener("click", () => {
 		const batch = Array.from(hiddenItems).slice(visible, visible + STEP);
@@ -87,5 +99,35 @@ const today = new Date().toISOString().slice(0, 10);
 		if (visible >= hiddenItems.length) {
 			loadMore.style.display = "none";
 		}
+	});
+
+	// フィルタ解除: ページリロードで初期状態に戻す
+	filterReset?.addEventListener("click", () => {
+		window.location.reload();
+	});
+
+	// タグフィルタ: タグをクリックすると該当タグの記事のみ表示
+	document.addEventListener("click", (e) => {
+		const target = (e.target as HTMLElement).closest<HTMLElement>(".news-tag-filter");
+		if (!target) return;
+
+		const tag = target.dataset.tag;
+		if (!tag) return;
+
+		isFiltered = true;
+		for (const card of allCards) {
+			const tags = card.dataset.tags;
+			if (!tags) continue;
+			const parsed: string[] = JSON.parse(tags);
+			if (parsed.includes(tag)) {
+				card.style.display = "";
+				card.classList.remove("news-hidden");
+			} else {
+				card.style.display = "none";
+			}
+		}
+
+		if (loadMore) loadMore.style.display = "none";
+		if (filterReset) filterReset.classList.remove("hidden");
 	});
 </script>
