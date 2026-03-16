@@ -6,13 +6,16 @@ import NewsCard from "../components/NewsCard.astro";
 import { getDb } from "../db/client";
 import { articles } from "../db/schema";
 import { formatDisplayDate } from "../lib/date";
+import { dedupeByTitle } from "../lib/articles";
 
 const db = getDb(env.DB);
 
-const rows = await db
+const allRows = await db
 	.select()
 	.from(articles)
 	.orderBy(desc(articles.impact), desc(articles.publishedAt));
+
+const rows = dedupeByTitle(allRows);
 
 const today = new Date().toISOString().slice(0, 10);
 ---
