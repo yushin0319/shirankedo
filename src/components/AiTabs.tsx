@@ -18,6 +18,7 @@ type AiTabsProps = {
   apiCommentText: string | null;
   subCommentText: string | null;
   providerDotClass: Record<string, string>;
+  jpyPerUsd?: number;
 };
 
 type ApiRow = {
@@ -44,6 +45,7 @@ export function AiTabs({
   apiCommentText,
   subCommentText,
   providerDotClass,
+  jpyPerUsd = 150,
 }: AiTabsProps) {
   const [activeTab, setActiveTab] = useState<"text" | "sub">("text");
   const [apiSort, setApiSort] = useState<SortState>({
@@ -65,6 +67,7 @@ export function AiTabs({
           m.inputPrice,
           m.outputPrice,
           m.currency,
+          jpyPerUsd,
         );
         return {
           model: m,
@@ -75,7 +78,7 @@ export function AiTabs({
           dotClass: providerDotClass[m.provider] ?? "",
         };
       }),
-    [models, providerDotClass],
+    [models, providerDotClass, jpyPerUsd],
   );
 
   // ソート済みAPI行
