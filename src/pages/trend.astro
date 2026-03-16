@@ -6,6 +6,7 @@ import { getDb } from "../db/client";
 import { trackingRepos, repoStats, pageComments } from "../db/schema";
 import { isNewRepo } from "../lib/trend";
 import { formatDisplayDate } from "../lib/date";
+import { repoToGitHubUrl } from "../lib/github";
 
 const db = getDb(env.DB);
 
@@ -105,6 +106,15 @@ const now = new Date();
 								</td>
 								<td class="py-3.5 px-4 align-middle">
 									<span class="text-[13px] font-bold text-ink">{r.displayName}</span>
+									<a
+										href={repoToGitHubUrl(r.repo)}
+										target="_blank"
+										rel="noopener noreferrer"
+										class="inline-flex items-center ml-1.5 text-muted hover:text-ink transition-colors align-middle"
+										title={r.repo}
+									>
+										<svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+									</a>
 									{isNew && (
 										<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-0.5 rounded-sm bg-accent text-white font-medium ml-2 align-middle">NEW</span>
 									)}
@@ -155,6 +165,15 @@ const now = new Date();
 						</div>
 						<div class="text-[14px] font-bold text-ink mb-1 flex items-center flex-wrap gap-1">
 							{r.displayName}
+							<a
+								href={repoToGitHubUrl(r.repo)}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="inline-flex items-center text-muted hover:text-ink transition-colors"
+								title={r.repo}
+							>
+								<svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+							</a>
 							{isNew && (
 								<span class="font-mono text-[8px] tracking-[.08em] px-1.5 py-0.5 rounded-sm bg-accent text-white font-medium ml-1">NEW</span>
 							)}

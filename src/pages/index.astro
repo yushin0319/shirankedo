@@ -31,8 +31,11 @@ const today = new Date().toISOString().slice(0, 10);
 	<main class="relative z-1 max-w-[1060px] mx-auto px-10 pt-6 pb-20 max-md:px-4 max-md:pb-15">
 		<div class="flex flex-col" id="news-list">
 			{
-				rows.map((article, i) => (
-					<div class:list={[{ "news-hidden": i >= 10 }]}>
+				rows.map((article, i) => {
+					const tagsArr = JSON.parse(article.tags) as string[];
+					if (article.isPaper === 1) tagsArr.unshift("PAPER");
+					return (
+					<div class:list={[{ "news-hidden": i >= 10 }]} data-tags={JSON.stringify(tagsArr)}>
 						<NewsCard
 							title={article.title}
 							summary={article.summary}
@@ -45,7 +48,7 @@ const today = new Date().toISOString().slice(0, 10);
 							index={i}
 						/>
 					</div>
-				))
+				);})
 			}
 		</div>
 		{rows.length > 10 && (
@@ -75,6 +78,7 @@ const today = new Date().toISOString().slice(0, 10);
 <script>
 	const STEP = 10;
 	const loadMore = document.getElementById("load-more");
+	const allCards = document.querySelectorAll<HTMLElement>("#news-list > div");
 	const hiddenItems = document.querySelectorAll<HTMLElement>("#news-list .news-hidden");
 	let visible = 0;
 
@@ -87,5 +91,32 @@ const today = new Date().toISOString().slice(0, 10);
 		if (visible >= hiddenItems.length) {
 			loadMore.style.display = "none";
 		}
+	});
+
+	// タグフィルタ: タグをクリックすると該当タグの記事のみ表示
+	document.addEventListener("click", (e) => {
+		const target = (e.target as HTMLElement).closest<HTMLElement>(".news-tag-filter");
+		if (!target) return;
+
+		const tag = target.dataset.tag;
+		if (!tag) return;
+
+		let visibleCount = 0;
+		for (const card of allCards) {
+			const tags = card.dataset.tags;
+			if (!tags) continue;
+			// tags は JSON配列文字列
+			const parsed: string[] = JSON.parse(tags);
+			if (parsed.includes(tag)) {
+				card.style.display = "";
+				card.classList.remove("news-hidden");
+				visibleCount++;
+			} else {
+				card.style.display = "none";
+			}
+		}
+
+		// フィルタ中は「もっと見る」を非表示
+		if (loadMore) loadMore.style.display = "none";
 	});
 </script>

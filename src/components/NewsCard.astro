@@ -53,12 +53,15 @@ const tagColorMap: Record<string, string> = {
 				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-accent text-white font-medium">NEW</span>
 			)}
 			{isPaper && (
-				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-ink text-white font-medium">PAPER</span>
+				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-ink text-white font-medium cursor-pointer hover:opacity-80 transition-opacity news-tag-filter" data-tag="PAPER">PAPER</span>
 			)}
 			{tags.map(tag => {
 				const key = getTagKey(tag);
 				return (
-					<span class:list={["font-mono text-[9px] tracking-[.1em] px-2 py-0.5 rounded-sm", tagColorMap[key] ?? tagColorMap.career]}>
+					<span
+						class:list={["font-mono text-[9px] tracking-[.1em] px-2 py-0.5 rounded-sm cursor-pointer hover:opacity-80 transition-opacity news-tag-filter", tagColorMap[key] ?? tagColorMap.career]}
+						data-tag={tag}
+					>
 						{tag}
 					</span>
 				);
