@@ -1,21 +1,21 @@
 ---
 import { env } from "cloudflare:workers";
-import { desc } from "drizzle-orm";
 import Layout from "../layouts/Layout.astro";
 import NewsCard from "../components/NewsCard.astro";
 import { getDb } from "../db/client";
 import { articles } from "../db/schema";
 import { formatDisplayDate } from "../lib/date";
 import { dedupeByTitle } from "../lib/articles";
+import { articleDecayScore } from "../lib/score";
 
 const db = getDb(env.DB);
 
-const allRows = await db
-	.select()
-	.from(articles)
-	.orderBy(desc(articles.impact), desc(articles.publishedAt));
+const allRows = await db.select().from(articles);
 
-const rows = dedupeByTitle(allRows);
+const now = new Date();
+const rows = dedupeByTitle(allRows).sort(
+	(a, b) => articleDecayScore(b.impact, b.publishedAt, now) - articleDecayScore(a.impact, a.publishedAt, now),
+);
 
 const today = new Date().toISOString().slice(0, 10);
 ---
