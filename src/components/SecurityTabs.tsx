@@ -34,9 +34,37 @@ export function SecurityTabs({
   const [activeTab, setActiveTab] = useState<TabId>("summary");
   const [vulnVisibleCount, setVulnVisibleCount] = useState(STEP);
   const [updateVisibleCount, setUpdateVisibleCount] = useState(STEP);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const vulnTop5 = vulns.slice(0, 5);
   const relTop5 = rels.slice(0, 5);
+
+  const query = searchQuery.toLowerCase();
+  const filteredVulns = query
+    ? vulns.filter(
+        (v) =>
+          v.title.toLowerCase().includes(query) ||
+          v.cveId.toLowerCase().includes(query),
+      )
+    : vulns;
+  const filteredRels = query
+    ? rels.filter((r) => {
+        const name = resolveReleaseName(r.repo, repoMap);
+        const desc = resolveReleaseDescription(r.repo, repoMap);
+        return (
+          name.toLowerCase().includes(query) ||
+          (desc?.toLowerCase().includes(query) ?? false) ||
+          r.version.toLowerCase().includes(query) ||
+          r.repo.toLowerCase().includes(query)
+        );
+      })
+    : rels;
+
+  function handleSearch(value: string) {
+    setSearchQuery(value);
+    setVulnVisibleCount(STEP);
+    setUpdateVisibleCount(STEP);
+  }
 
   const tabs: { id: TabId; label: string }[] = [
     { id: "summary", label: "日次サマリー" },
@@ -182,7 +210,16 @@ export function SecurityTabs({
             </span>
           </div>
 
-          {vulns.map((v, i) => (
+          <input
+            type="text"
+            aria-label="CVE ID やキーワードで脆弱性を検索"
+            placeholder="CVE ID やキーワードで検索..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full mb-4 px-4 py-2.5 font-mono text-[12px] text-ink bg-surface border border-border rounded-sm tracking-[.02em] outline-none transition-all placeholder:text-muted/50 focus:border-ink"
+          />
+
+          {filteredVulns.map((v, i) => (
             <div
               key={v.id}
               className={`vuln-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:px-5${
@@ -209,14 +246,20 @@ export function SecurityTabs({
             </div>
           ))}
 
-          {vulnVisibleCount < vulns.length && (
+          {filteredVulns.length === 0 && query && (
+            <p className="text-center text-muted py-8 font-mono text-[11px]">
+              該当する脆弱性が見つかりません
+            </p>
+          )}
+
+          {vulnVisibleCount < filteredVulns.length && (
             <button
               type="button"
               className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
               id="vuln-more"
               onClick={() =>
                 setVulnVisibleCount((prev) =>
-                  Math.min(prev + STEP, vulns.length),
+                  Math.min(prev + STEP, filteredVulns.length),
                 )
               }
             >
@@ -240,7 +283,16 @@ export function SecurityTabs({
             </span>
           </div>
 
-          {rels.map((r, i) => {
+          <input
+            type="text"
+            aria-label="リポジトリ名やバージョンでリリースを検索"
+            placeholder="リポジトリ名やバージョンで検索..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="w-full mb-4 px-4 py-2.5 font-mono text-[12px] text-ink bg-surface border border-border rounded-sm tracking-[.02em] outline-none transition-all placeholder:text-muted/50 focus:border-ink"
+          />
+
+          {filteredRels.map((r, i) => {
             const isMajor = r.type === "major";
             const name = resolveReleaseName(r.repo, repoMap);
             const desc = resolveReleaseDescription(r.repo, repoMap);
@@ -285,14 +337,20 @@ export function SecurityTabs({
             );
           })}
 
-          {updateVisibleCount < rels.length && (
+          {filteredRels.length === 0 && query && (
+            <p className="text-center text-muted py-8 font-mono text-[11px]">
+              該当するリリースが見つかりません
+            </p>
+          )}
+
+          {updateVisibleCount < filteredRels.length && (
             <button
               type="button"
               className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
               id="update-more"
               onClick={() =>
                 setUpdateVisibleCount((prev) =>
-                  Math.min(prev + STEP, rels.length),
+                  Math.min(prev + STEP, filteredRels.length),
                 )
               }
             >
