@@ -50,7 +50,8 @@ try {
 	repoMap = Object.fromEntries(
 		repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }])
 	);
-} catch {
+} catch (e) {
+	console.error("Failed to fetch security data:", e);
 	fetchError = true;
 }
 

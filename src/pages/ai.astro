@@ -43,7 +43,8 @@ try {
 
 	apiCommentText = aiApiComment[0]?.content ?? null;
 	subCommentText = aiSubComment[0]?.content ?? null;
-} catch {
+} catch (e) {
+	console.error("Failed to fetch AI data:", e);
 	fetchError = true;
 }
 

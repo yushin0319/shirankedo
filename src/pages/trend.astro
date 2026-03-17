@@ -57,7 +57,8 @@ try {
 		.limit(1);
 
 	trendComment = comment[0]?.content ?? null;
-} catch {
+} catch (e) {
+	console.error("Failed to fetch trend data:", e);
 	fetchError = true;
 }
 

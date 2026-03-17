@@ -18,7 +18,8 @@ try {
 	rows = dedupeByTitle(allRows).sort(
 		(a, b) => articleDecayScore(b.impact, b.publishedAt, now) - articleDecayScore(a.impact, a.publishedAt, now),
 	);
-} catch {
+} catch (e) {
+	console.error("Failed to fetch articles:", e);
 	fetchError = true;
 }
 
