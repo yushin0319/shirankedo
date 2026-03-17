@@ -83,10 +83,10 @@ export function SecurityTabs({
           {vulnTop5.map((v) => (
             <div
               key={v.id}
-              className="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 flex items-center gap-3.5 shadow-[2px_2px_0_rgba(0,0,0,.06)]"
+              className="relative bg-surface border border-border rounded-sm mb-2 p-3.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:px-5"
             >
               <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-critical" />
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0">
                 <div className="text-[13px] font-bold text-ink leading-normal">
                   {v.title}
                 </div>
@@ -185,7 +185,7 @@ export function SecurityTabs({
           {vulns.map((v, i) => (
             <div
               key={v.id}
-              className={`vuln-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)]${
+              className={`vuln-card relative bg-surface border border-border rounded-sm mb-2.5 p-4.5 px-6 shadow-[2px_2px_0_rgba(0,0,0,.06)] max-md:px-5${
                 i >= vulnVisibleCount ? " vuln-hidden" : ""
               }`}
             >
