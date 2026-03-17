@@ -212,6 +212,7 @@ export function SecurityTabs({
 
           <input
             type="text"
+            aria-label="CVE ID やキーワードで脆弱性を検索"
             placeholder="CVE ID やキーワードで検索..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
@@ -258,7 +259,7 @@ export function SecurityTabs({
               id="vuln-more"
               onClick={() =>
                 setVulnVisibleCount((prev) =>
-                  Math.min(prev + STEP, vulns.length),
+                  Math.min(prev + STEP, filteredVulns.length),
                 )
               }
             >
@@ -284,6 +285,7 @@ export function SecurityTabs({
 
           <input
             type="text"
+            aria-label="リポジトリ名やバージョンでリリースを検索"
             placeholder="リポジトリ名やバージョンで検索..."
             value={searchQuery}
             onChange={(e) => handleSearch(e.target.value)}
@@ -348,7 +350,7 @@ export function SecurityTabs({
               id="update-more"
               onClick={() =>
                 setUpdateVisibleCount((prev) =>
-                  Math.min(prev + STEP, rels.length),
+                  Math.min(prev + STEP, filteredRels.length),
                 )
               }
             >
