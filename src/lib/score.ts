@@ -1,4 +1,4 @@
-const DECAY_RATE = 0.94;
+const DECAY_RATE = 0.85;
 
 /** 日付文字列から経過日数を算出（0以上） */
 function daysSince(publishedAt: string, now: Date = new Date()): number {

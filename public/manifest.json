@@ -1,0 +1,22 @@
+{
+  "name": "ShiranKedo",
+  "short_name": "ShiranKedo",
+  "description": "テック界隈で今日起きたことを3分で把握するニュースダッシュボード",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#f5f3ee",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/apple-touch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "apple touch icon"
+    }
+  ]
+}
