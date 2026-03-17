@@ -83,7 +83,7 @@ const now = new Date();
 
 		{/* PC: テーブル */}
 		<div class="hidden md:block bg-surface border border-border rounded-sm shadow-[2px_2px_0_rgba(0,0,0,.06)] overflow-hidden">
-			<table class="w-full border-collapse">
+			<table class="w-full border-collapse" aria-label="トレンドリポジトリ">
 				<thead>
 					<tr>
 						<th class="font-mono text-[9px] text-muted tracking-[.1em] uppercase text-left py-3 px-4 pl-6 border-b border-border bg-surface whitespace-nowrap">#</th>
@@ -208,7 +208,7 @@ const now = new Date();
 					<div class="text-[13px] leading-[1.9] text-sticky-ink">
 						{trendComment}
 					</div>
-					<div class="absolute bottom-0 right-0 w-0 h-0 border-solid border-[0_0_24px_24px] border-transparent border-b-[rgba(0,0,0,.18)] max-md:hidden"></div>
+					<div class="sticky-fold max-md:hidden"></div>
 				</div>
 			</div>
 		)}

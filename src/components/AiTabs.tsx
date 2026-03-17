@@ -215,7 +215,7 @@ export function AiTabs({
 
           {/* PC テーブル */}
           <div className="hidden md:block bg-surface border border-border rounded-sm shadow-[2px_2px_0_rgba(0,0,0,.06)] overflow-x-auto mt-4">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse" aria-label="AIモデル比較">
               <thead>
                 <tr>
                   <th
@@ -229,6 +229,13 @@ export function AiTabs({
                     style={{ width: "12%" }}
                     data-sort="provider"
                     onClick={() => handleApiSort("provider")}
+                    aria-sort={
+                      apiSort.key === "provider"
+                        ? apiSort.dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
                   >
                     Provider
                   </th>
@@ -237,6 +244,13 @@ export function AiTabs({
                     style={{ width: "16%" }}
                     data-sort="score"
                     onClick={() => handleApiSort("score")}
+                    aria-sort={
+                      apiSort.key === "score"
+                        ? apiSort.dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
                   >
                     Intelligence
                   </th>
@@ -251,6 +265,13 @@ export function AiTabs({
                     style={{ width: "14%" }}
                     data-sort="monthly"
                     onClick={() => handleApiSort("monthly")}
+                    aria-sort={
+                      apiSort.key === "monthly"
+                        ? apiSort.dir === "asc"
+                          ? "ascending"
+                          : "descending"
+                        : "none"
+                    }
                   >
                     月額目安 *
                   </th>
