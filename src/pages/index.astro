@@ -8,14 +8,20 @@ import { formatDisplayDate } from "../lib/date";
 import { dedupeByTitle } from "../lib/articles";
 import { articleDecayScore } from "../lib/score";
 
-const db = getDb(env.DB);
+let rows: any[] = [];
+let fetchError = false;
 
-const allRows = await db.select().from(articles);
-
-const now = new Date();
-const rows = dedupeByTitle(allRows).sort(
-	(a, b) => articleDecayScore(b.impact, b.publishedAt, now) - articleDecayScore(a.impact, a.publishedAt, now),
-);
+try {
+	const db = getDb(env.DB);
+	const allRows = await db.select().from(articles);
+	const now = new Date();
+	rows = dedupeByTitle(allRows).sort(
+		(a, b) => articleDecayScore(b.impact, b.publishedAt, now) - articleDecayScore(a.impact, a.publishedAt, now),
+	);
+} catch (e) {
+	console.error("Failed to fetch articles:", e);
+	fetchError = true;
+}
 
 const today = new Date().toISOString().slice(0, 10);
 ---
@@ -66,7 +72,14 @@ const today = new Date().toISOString().slice(0, 10);
 			</button>
 		)}
 		{
-			rows.length === 0 && (
+			fetchError && (
+				<p class="text-center text-muted py-20 font-mono text-sm">
+					データの取得に失敗しました。しばらく待ってから再読み込みしてね
+				</p>
+			)
+		}
+		{
+			!fetchError && rows.length === 0 && (
 				<p class="text-center text-muted py-20 font-mono text-sm">
 					まだ記事がないよ〜。知らんけど
 				</p>
