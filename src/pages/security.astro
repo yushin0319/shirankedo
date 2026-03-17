@@ -5,47 +5,54 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { vulnerabilities, releases, securityDaily, trackingRepos, repoStats } from "../db/schema";
 import { SecurityTabs } from "../components/SecurityTabs";
+import { ErrorBoundary } from "../components/ErrorFallback";
 import { formatDisplayDate } from "../lib/date";
 import { vulnDecayScore, releaseDecayScore } from "../lib/score";
 import { sql } from "drizzle-orm";
 
-const db = getDb(env.DB);
+let vulns: any[] = [];
+let rels: any[] = [];
+let dailyComment: string | null = null;
+let repoMap: Record<string, { displayName: string; description: string | null }> = {};
+let fetchError = false;
 
-const daily = await db
-	.select()
-	.from(securityDaily)
-	.orderBy(desc(securityDaily.createdAt))
-	.limit(1);
+try {
+	const db = getDb(env.DB);
 
-const vulnsRaw = await db.select().from(vulnerabilities);
+	const daily = await db
+		.select()
+		.from(securityDaily)
+		.orderBy(desc(securityDaily.createdAt))
+		.limit(1);
 
-const relsRaw = await db.select().from(releases);
+	const vulnsRaw = await db.select().from(vulnerabilities);
+	const relsRaw = await db.select().from(releases);
 
-// 各リポの最新star数を取得
-const latestStats = await db
-	.select({ repo: repoStats.repo, stars: repoStats.stars })
-	.from(repoStats)
-	.where(sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`);
-const starsMap: Record<string, number> = Object.fromEntries(
-	latestStats.map((s) => [s.repo, s.stars]),
-);
+	const latestStats = await db
+		.select({ repo: repoStats.repo, stars: repoStats.stars })
+		.from(repoStats)
+		.where(sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`);
+	const starsMap: Record<string, number> = Object.fromEntries(
+		latestStats.map((s) => [s.repo, s.stars]),
+	);
 
-// 時間減衰スコアでソート
-const now = new Date();
-const vulns = vulnsRaw.sort(
-	(a, b) => vulnDecayScore(b.cvssScore, b.publishedAt, now) - vulnDecayScore(a.cvssScore, a.publishedAt, now),
-);
-const rels = relsRaw.sort(
-	(a, b) => releaseDecayScore(starsMap[b.repo] ?? 0, b.type, b.publishedAt, now) - releaseDecayScore(starsMap[a.repo] ?? 0, a.type, a.publishedAt, now),
-);
+	const now = new Date();
+	vulns = vulnsRaw.sort(
+		(a, b) => vulnDecayScore(b.cvssScore, b.publishedAt, now) - vulnDecayScore(a.cvssScore, a.publishedAt, now),
+	);
+	rels = relsRaw.sort(
+		(a, b) => releaseDecayScore(starsMap[b.repo] ?? 0, b.type, b.publishedAt, now) - releaseDecayScore(starsMap[a.repo] ?? 0, a.type, a.publishedAt, now),
+	);
 
-const dailyComment = daily[0]?.comment ?? null;
+	dailyComment = daily[0]?.comment ?? null;
 
-// tracking_reposから表示名・説明を取得（Record に変換）
-const repos = await db.select().from(trackingRepos);
-const repoMap = Object.fromEntries(
-	repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }])
-);
+	const repos = await db.select().from(trackingRepos);
+	repoMap = Object.fromEntries(
+		repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }])
+	);
+} catch {
+	fetchError = true;
+}
 
 const today = new Date().toISOString().slice(0, 10);
 const displayDate = formatDisplayDate(today);
@@ -59,13 +66,22 @@ const displayDate = formatDisplayDate(today);
 			{displayDate}
 		</div>
 	</div>
-	<SecurityTabs
-		client:idle
-		vulns={vulns}
-		rels={rels}
-		repoMap={repoMap}
-		dailyComment={dailyComment}
-	/>
+	{fetchError ? (
+		<main class="relative z-1 max-w-265 mx-auto px-10 pb-20 max-md:px-4">
+			<p class="text-center text-muted py-20 font-mono text-sm">
+				データの取得に失敗しました。しばらく待ってから再読み込みしてね
+			</p>
+		</main>
+	) : (
+		<ErrorBoundary client:idle>
+			<SecurityTabs
+				vulns={vulns}
+				rels={rels}
+				repoMap={repoMap}
+				dailyComment={dailyComment}
+			/>
+		</ErrorBoundary>
+	)}
 </Layout>
 
 <style is:global>

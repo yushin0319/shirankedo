@@ -5,37 +5,47 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
+import { ErrorBoundary } from "../components/ErrorFallback";
 import { formatDisplayDate } from "../lib/date";
 
-const db = getDb(env.DB);
+let models: any[] = [];
+let plans: any[] = [];
+let apiCommentText: string | null = null;
+let subCommentText: string | null = null;
+let fetchError = false;
 
-const models = await db
-	.select()
-	.from(llmModels)
-	.orderBy(desc(llmModels.score));
+try {
+	const db = getDb(env.DB);
 
-const plans = await db
-	.select()
-	.from(subscriptionPlans)
-	.orderBy(subscriptionPlans.provider, subscriptionPlans.price);
+	models = await db
+		.select()
+		.from(llmModels)
+		.orderBy(desc(llmModels.score));
 
-// AI比較コメント（タブごとに1つ）
-const aiApiComment = await db
-	.select()
-	.from(pageComments)
-	.where(sql`${pageComments.type} = 'ai_api'`)
-	.orderBy(desc(pageComments.createdAt))
-	.limit(1);
+	plans = await db
+		.select()
+		.from(subscriptionPlans)
+		.orderBy(subscriptionPlans.provider, subscriptionPlans.price);
 
-const aiSubComment = await db
-	.select()
-	.from(pageComments)
-	.where(sql`${pageComments.type} = 'ai_sub'`)
-	.orderBy(desc(pageComments.createdAt))
-	.limit(1);
+	const aiApiComment = await db
+		.select()
+		.from(pageComments)
+		.where(sql`${pageComments.type} = 'ai_api'`)
+		.orderBy(desc(pageComments.createdAt))
+		.limit(1);
 
-const apiCommentText = aiApiComment[0]?.content ?? null;
-const subCommentText = aiSubComment[0]?.content ?? null;
+	const aiSubComment = await db
+		.select()
+		.from(pageComments)
+		.where(sql`${pageComments.type} = 'ai_sub'`)
+		.orderBy(desc(pageComments.createdAt))
+		.limit(1);
+
+	apiCommentText = aiApiComment[0]?.content ?? null;
+	subCommentText = aiSubComment[0]?.content ?? null;
+} catch {
+	fetchError = true;
+}
 
 // KVから為替レートを取得（フォールバック: 150円）
 let jpyPerUsd = 150;
@@ -84,15 +94,24 @@ const providerDotClass: Record<string, string> = {
 			{formatDisplayDate(new Date().toISOString().slice(0, 10))}
 		</div>
 	</div>
-	<AiTabs
-		client:idle
-		models={models}
-		plans={plans}
-		apiCommentText={apiCommentText}
-		subCommentText={subCommentText}
-		providerDotClass={providerDotClass}
-		jpyPerUsd={jpyPerUsd}
-	/>
+	{fetchError ? (
+		<main class="relative z-1 max-w-265 mx-auto px-10 pb-20 max-md:px-4">
+			<p class="text-center text-muted py-20 font-mono text-sm">
+				データの取得に失敗しました。しばらく待ってから再読み込みしてね
+			</p>
+		</main>
+	) : (
+		<ErrorBoundary client:idle>
+			<AiTabs
+				models={models}
+				plans={plans}
+				apiCommentText={apiCommentText}
+				subCommentText={subCommentText}
+				providerDotClass={providerDotClass}
+				jpyPerUsd={jpyPerUsd}
+			/>
+		</ErrorBoundary>
+	)}
 </Layout>
 
 <style is:global>

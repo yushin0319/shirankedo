@@ -8,54 +8,58 @@ import { isNewRepo } from "../lib/trend";
 import { formatDisplayDate } from "../lib/date";
 import { repoToGitHubUrl } from "../lib/github";
 
-const db = getDb(env.DB);
+let ranked: any[] = [];
+let trendComment: string | null = null;
+let fetchError = false;
 
-// リポ情報 + 直近2週分のスター数のみ取得
-const repos = await db.select().from(trackingRepos);
+try {
+	const db = getDb(env.DB);
 
-const twoWeeksAgo = new Date();
-twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 15);
-const cutoff = twoWeeksAgo.toISOString().slice(0, 10);
+	const repos = await db.select().from(trackingRepos);
 
-const latestStats = await db
-	.select()
-	.from(repoStats)
-	.where(sql`${repoStats.createdAt} >= ${cutoff}`)
-	.orderBy(desc(repoStats.createdAt));
+	const twoWeeksAgo = new Date();
+	twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 15);
+	const cutoff = twoWeeksAgo.toISOString().slice(0, 10);
 
-// リポごとに最新と1つ前を取得
-const repoMap = new Map<string, { stars: number; prevStars: number; diff: number }>();
-for (const stat of latestStats) {
-	const existing = repoMap.get(stat.repo);
-	if (!existing) {
-		repoMap.set(stat.repo, { stars: stat.stars, prevStars: 0, diff: 0 });
-	} else if (existing.prevStars === 0) {
-		existing.prevStars = stat.stars;
-		existing.diff = existing.stars - stat.stars;
+	const latestStats = await db
+		.select()
+		.from(repoStats)
+		.where(sql`${repoStats.createdAt} >= ${cutoff}`)
+		.orderBy(desc(repoStats.createdAt));
+
+	const repoMap = new Map<string, { stars: number; prevStars: number; diff: number }>();
+	for (const stat of latestStats) {
+		const existing = repoMap.get(stat.repo);
+		if (!existing) {
+			repoMap.set(stat.repo, { stars: stat.stars, prevStars: 0, diff: 0 });
+		} else if (existing.prevStars === 0) {
+			existing.prevStars = stat.stars;
+			existing.diff = existing.stars - stat.stars;
+		}
 	}
+
+	ranked = repos
+		.map((r) => {
+			const stats = repoMap.get(r.repo);
+			return {
+				...r,
+				stars: stats?.stars ?? 0,
+				diff: stats?.diff ?? 0,
+			};
+		})
+		.sort((a, b) => b.diff - a.diff);
+
+	const comment = await db
+		.select()
+		.from(pageComments)
+		.where(sql`${pageComments.type} = 'trend'`)
+		.orderBy(desc(pageComments.createdAt))
+		.limit(1);
+
+	trendComment = comment[0]?.content ?? null;
+} catch {
+	fetchError = true;
 }
-
-// ランキング: 週次差分降順 TOP20
-const ranked = repos
-	.map((r) => {
-		const stats = repoMap.get(r.repo);
-		return {
-			...r,
-			stars: stats?.stars ?? 0,
-			diff: stats?.diff ?? 0,
-		};
-	})
-	.sort((a, b) => b.diff - a.diff);
-
-// トレンドコメント
-const comment = await db
-	.select()
-	.from(pageComments)
-	.where(sql`${pageComments.type} = 'trend'`)
-	.orderBy(desc(pageComments.createdAt))
-	.limit(1);
-
-const trendComment = comment[0]?.content ?? null;
 
 const now = new Date();
 
@@ -213,7 +217,12 @@ const now = new Date();
 			</div>
 		)}
 
-		{ranked.length === 0 && (
+		{fetchError && (
+			<p class="text-center text-muted py-20 font-mono text-sm">
+				データの取得に失敗しました。しばらく待ってから再読み込みしてね
+			</p>
+		)}
+		{!fetchError && ranked.length === 0 && (
 			<p class="text-center text-muted py-20 font-mono text-sm">トレンドデータなし</p>
 		)}
 	</main>
