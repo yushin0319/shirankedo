@@ -53,17 +53,17 @@ const tagColorMap: Record<string, string> = {
 				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-accent text-white font-medium">NEW</span>
 			)}
 			{isPaper && (
-				<span class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-ink text-white font-medium cursor-pointer hover:opacity-80 transition-opacity news-tag-filter" data-tag="PAPER">PAPER</span>
+				<button type="button" class="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-ink text-white font-medium cursor-pointer hover:opacity-80 transition-opacity border-none news-tag-filter" data-tag="PAPER">PAPER</button>
 			)}
 			{tags.map(tag => {
 				const key = getTagKey(tag);
 				return (
-					<span
-						class:list={["font-mono text-[9px] tracking-[.1em] px-2 py-0.5 rounded-sm cursor-pointer hover:opacity-80 transition-opacity news-tag-filter", tagColorMap[key] ?? tagColorMap.career]}
+					<button type="button"
+						class:list={["font-mono text-[9px] tracking-[.1em] px-2 py-0.5 rounded-sm cursor-pointer hover:opacity-80 transition-opacity news-tag-filter border-none", tagColorMap[key] ?? tagColorMap.career]}
 						data-tag={tag}
 					>
 						{tag}
-					</span>
+					</button>
 				);
 			})}
 		</div>
@@ -88,16 +88,3 @@ const tagColorMap: Record<string, string> = {
 		</div>
 	</div>
 </div>
-
-<style>
-	.sticky-fold {
-		position: absolute;
-		bottom: 0;
-		right: 0;
-		width: 0;
-		height: 0;
-		border-style: solid;
-		border-width: 0 0 20px 20px;
-		border-color: transparent transparent rgba(0, 0, 0, 0.18) transparent;
-	}
-</style>

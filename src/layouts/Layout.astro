@@ -20,9 +20,19 @@ const navItems = [
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>{title} | ShiranKedo</title>
+		<meta name="description" content="テック界隈で今日起きたことを3分で把握するニュースダッシュボード" />
+		<meta property="og:title" content={`${title} | ShiranKedo`} />
+		<meta property="og:description" content="テック界隈で今日起きたことを3分で把握するニュースダッシュボード" />
+		<meta property="og:type" content="website" />
+		<meta property="og:url" content="https://shirankedo.y-fudo.workers.dev/" />
+		<meta property="og:image" content="https://shirankedo.y-fudo.workers.dev/og-image.svg" />
+		<meta name="twitter:card" content="summary" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 		<link
-			href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap"
+			href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=DM+Mono:wght@400;500&family=Noto+Sans+JP:wght@400;500;700&display=swap&subset=latin,japanese"
 			rel="stylesheet"
 		/>
 	</head>
@@ -65,6 +75,9 @@ const navItems = [
 				<button
 					class="hidden max-md:flex flex-col gap-[5px] p-1 bg-transparent border-none cursor-pointer"
 					id="hamburger"
+					aria-label="メニューを開く"
+					aria-expanded="false"
+					aria-controls="mobile-nav"
 				>
 					<span class="block w-5 h-[1.5px] bg-muted"></span>
 					<span class="block w-5 h-[1.5px] bg-muted"></span>
@@ -76,6 +89,7 @@ const navItems = [
 		<div
 			class="hidden fixed top-14 left-0 right-0 bg-surface border-b border-border px-5 py-3 flex-col z-99"
 			id="mobile-nav"
+			aria-hidden="true"
 		>
 			{
 				navItems.map((item) => (
@@ -107,8 +121,11 @@ const navItems = [
 			const hamburger = document.getElementById("hamburger");
 			const mobileNav = document.getElementById("mobile-nav");
 			hamburger?.addEventListener("click", () => {
+				const isOpen = mobileNav?.classList.contains("flex");
 				mobileNav?.classList.toggle("hidden");
 				mobileNav?.classList.toggle("flex");
+				hamburger.setAttribute("aria-expanded", String(!isOpen));
+				mobileNav?.setAttribute("aria-hidden", String(isOpen));
 			});
 		</script>
 	</body>
