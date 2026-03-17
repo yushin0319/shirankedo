@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { articleDecayScore, releaseDecayScore, vulnDecayScore } from "./score";
 
-const DECAY = 0.94;
+const DECAY = 0.85;
 
 describe("articleDecayScore", () => {
   afterEach(() => {
@@ -13,12 +13,12 @@ describe("articleDecayScore", () => {
     expect(articleDecayScore(8, "2026-03-15")).toBeCloseTo(8);
   });
 
-  it("1日経過で0.94倍", () => {
+  it("1日経過で0.85倍", () => {
     vi.setSystemTime(new Date("2026-03-16T12:00:00Z"));
     expect(articleDecayScore(10, "2026-03-15")).toBeCloseTo(10 * DECAY);
   });
 
-  it("3日経過で0.94^3倍", () => {
+  it("3日経過で0.85^3倍", () => {
     vi.setSystemTime(new Date("2026-03-18T12:00:00Z"));
     expect(articleDecayScore(5, "2026-03-15")).toBeCloseTo(5 * DECAY ** 3);
   });
@@ -46,7 +46,7 @@ describe("vulnDecayScore", () => {
     expect(vulnDecayScore(9.8, "2026-03-15")).toBeCloseTo(9.8);
   });
 
-  it("2日経過で0.94^2倍", () => {
+  it("2日経過で0.85^2倍", () => {
     vi.setSystemTime(new Date("2026-03-17T12:00:00Z"));
     expect(vulnDecayScore(9.0, "2026-03-15")).toBeCloseTo(9.0 * DECAY ** 2);
   });
@@ -72,7 +72,7 @@ describe("releaseDecayScore", () => {
     expect(releaseDecayScore(1000, "minor", "2026-03-15")).toBeCloseTo(1000);
   });
 
-  it("1日経過のmajorはstars×2×0.94", () => {
+  it("1日経過のmajorはstars×2×0.85", () => {
     vi.setSystemTime(new Date("2026-03-16T12:00:00Z"));
     expect(releaseDecayScore(500, "major", "2026-03-15")).toBeCloseTo(
       500 * 2 * DECAY,
