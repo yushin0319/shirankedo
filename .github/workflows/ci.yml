@@ -17,6 +17,8 @@ jobs:
       - run: npm ci
       - name: Biome check
         run: npx @biomejs/biome check .
+      - name: Vitest
+        run: npx vitest run
       - name: Astro check
         run: npx astro check
       - name: Build
