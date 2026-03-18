@@ -203,6 +203,87 @@ describe("AiTabs", () => {
       const tbody = document.getElementById("sub-tbody");
       expect(tbody?.querySelectorAll("tr").length).toBe(4);
     });
+
+    it("USDプランがjpyPerUsdで円換算表示される", async () => {
+      const user = userEvent.setup();
+      const plans = [
+        {
+          id: 1,
+          provider: "OpenAI",
+          service: "ChatGPT",
+          planName: "Plus",
+          price: 20,
+          currency: "USD",
+          models: JSON.stringify(["GPT-4o"]),
+          limits: null,
+          createdAt: "2026-01-01",
+          updatedAt: null,
+        },
+      ];
+      render(<AiTabs {...defaultProps} plans={plans} jpyPerUsd={148} />);
+
+      await user.click(screen.getByRole("button", { name: "サブスク比較" }));
+
+      // $20 × 148 = ¥2,960
+      const tbody = document.getElementById("sub-tbody");
+      expect(tbody?.textContent).toContain("¥2,960");
+    });
+
+    it("EURプランがjpyPerEurで円換算表示される", async () => {
+      const user = userEvent.setup();
+      const plans = [
+        {
+          id: 1,
+          provider: "Mistral",
+          service: "Le Chat",
+          planName: "Pro",
+          price: 14.99,
+          currency: "EUR",
+          models: JSON.stringify(["Mistral Large"]),
+          limits: null,
+          createdAt: "2026-01-01",
+          updatedAt: null,
+        },
+      ];
+      render(
+        <AiTabs
+          {...defaultProps}
+          plans={plans}
+          jpyPerUsd={148}
+          jpyPerEur={162}
+        />,
+      );
+
+      await user.click(screen.getByRole("button", { name: "サブスク比較" }));
+
+      // €14.99 × 162 = ¥2,428
+      const tbody = document.getElementById("sub-tbody");
+      expect(tbody?.textContent).toContain("¥2,428");
+    });
+
+    it("JPYプランはそのまま円表示される", async () => {
+      const user = userEvent.setup();
+      const plans = [
+        {
+          id: 1,
+          provider: "Google",
+          service: "Gemini",
+          planName: "Advanced",
+          price: 2900,
+          currency: "JPY",
+          models: JSON.stringify(["Gemini"]),
+          limits: null,
+          createdAt: "2026-01-01",
+          updatedAt: null,
+        },
+      ];
+      render(<AiTabs {...defaultProps} plans={plans} jpyPerUsd={148} />);
+
+      await user.click(screen.getByRole("button", { name: "サブスク比較" }));
+
+      const tbody = document.getElementById("sub-tbody");
+      expect(tbody?.textContent).toContain("¥2,900");
+    });
   });
 
   describe("付箋", () => {

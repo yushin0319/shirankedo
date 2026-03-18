@@ -16,6 +16,20 @@ export function getTier(score: number): string {
   return "tier-c";
 }
 
+// サブスクプラン価格を円表示
+export function formatSubPrice(
+  price: number,
+  currency: string,
+  jpyPerUsd = 150,
+  jpyPerEur = 163,
+): string {
+  if (price === 0) return "¥0";
+  if (currency === "JPY") return `¥${Math.round(price).toLocaleString()}`;
+  const rate = currency === "EUR" ? jpyPerEur : jpyPerUsd;
+  const jpy = price * rate;
+  return `¥${Math.round(jpy).toLocaleString()}`;
+}
+
 // 月額目安を計算
 // シナリオ: input 1,200tok + output 200tok × 3,000 req/mo
 // = input 3.6M tok + output 0.6M tok

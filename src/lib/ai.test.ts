@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateMonthly, parseModels } from "./ai";
+import { estimateMonthly, formatSubPrice, parseModels } from "./ai";
 
 describe("parseModels", () => {
   it("有効なJSON配列をパースしてstring[]を返す", () => {
@@ -49,5 +49,40 @@ describe("estimateMonthly", () => {
 
   it("両方0なら¥0を返す", () => {
     expect(estimateMonthly(0, 0, "USD", 160)).toBe("¥0");
+  });
+});
+
+describe("formatSubPrice", () => {
+  it("USD価格をデフォルトレート(150)で円換算する", () => {
+    // $20 × 150 = ¥3,000
+    expect(formatSubPrice(20, "USD")).toBe("¥3,000");
+  });
+
+  it("USD価格を指定レートで円換算する", () => {
+    // $20 × 148 = ¥2,960
+    expect(formatSubPrice(20, "USD", 148)).toBe("¥2,960");
+  });
+
+  it("JPY価格はレートに関わらずそのまま円表示する", () => {
+    expect(formatSubPrice(2900, "JPY", 155)).toBe("¥2,900");
+  });
+
+  it("0円は¥0を返す", () => {
+    expect(formatSubPrice(0, "USD", 150)).toBe("¥0");
+  });
+
+  it("$100を指定レートで換算する", () => {
+    // $100 × 148.5 = ¥14,850
+    expect(formatSubPrice(100, "USD", 148.5)).toBe("¥14,850");
+  });
+
+  it("EUR価格をjpyPerEurで円換算する", () => {
+    // €14.99 × 162 = ¥2,428.38 → ¥2,428
+    expect(formatSubPrice(14.99, "EUR", 150, 162)).toBe("¥2,428");
+  });
+
+  it("EUR価格のデフォルトレート(163)で円換算する", () => {
+    // €14.99 × 163 = ¥2,443.37 → ¥2,443
+    expect(formatSubPrice(14.99, "EUR")).toBe("¥2,443");
   });
 });
