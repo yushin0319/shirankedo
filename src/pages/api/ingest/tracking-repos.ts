@@ -36,7 +36,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const db = getDb(env.DB);
-    const result = await processTrackingRepos(db, parsed.data);
+    const result = await processTrackingRepos(db, parsed.data as unknown[]);
     return jsonOk(result);
   } catch (e) {
     return handleApiError(e);

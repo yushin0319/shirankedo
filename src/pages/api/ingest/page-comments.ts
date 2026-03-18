@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request }) => {
 
   try {
     const db = getDb(env.DB);
-    const result = await processPageComments(db, parsed.data);
+    const result = await processPageComments(db, parsed.data as unknown[]);
     return jsonOk(result);
   } catch (e) {
     return handleApiError(e);
