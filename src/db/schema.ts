@@ -2,6 +2,7 @@
 
 import { sql } from "drizzle-orm";
 import {
+  index,
   integer,
   real,
   sqliteTable,
@@ -38,12 +39,16 @@ export const trackingRepos = sqliteTable("tracking_repos", {
 });
 
 // Star推移（週次スナップショット）
-export const repoStats = sqliteTable("repo_stats", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  repo: text("repo").notNull(),
-  stars: integer("stars").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-});
+export const repoStats = sqliteTable(
+  "repo_stats",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    repo: text("repo").notNull(),
+    stars: integer("stars").notNull(),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+  },
+  (table) => [index("repo_stats_repo_idx").on(table.repo)],
+);
 
 // 脆弱性
 export const vulnerabilities = sqliteTable("vulnerabilities", {

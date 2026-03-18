@@ -15,6 +15,13 @@
       "when": 1773496021515,
       "tag": "0001_aberrant_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773813113552,
+      "tag": "0002_easy_bill_hollister",
+      "breakpoints": true
     }
   ]
 }
