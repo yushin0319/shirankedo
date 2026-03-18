@@ -15,7 +15,7 @@ export const GET: APIRoute = async ({ request }) => {
     const db = getDb(env.DB);
     const urls = await getArticleUrls(db);
     return jsonOk({ data: urls });
-  } catch (e) {
-    return jsonError(500, e instanceof Error ? e.message : "Internal error");
+  } catch {
+    return jsonError(500, "Internal error");
   }
 };

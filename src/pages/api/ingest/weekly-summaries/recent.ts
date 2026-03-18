@@ -14,10 +14,13 @@ export const GET: APIRoute = async ({ request }) => {
   try {
     const db = getDb(env.DB);
     const url = new URL(request.url);
-    const limit = Number(url.searchParams.get("limit") ?? 4);
+    const limit = Math.min(
+      Math.max(Number(url.searchParams.get("limit") ?? 4) || 4, 1),
+      52,
+    );
     const summaries = await getRecentWeeklySummaries(db, limit);
     return jsonOk({ data: summaries });
-  } catch (e) {
-    return jsonError(500, e instanceof Error ? e.message : "Internal error");
+  } catch {
+    return jsonError(500, "Internal error");
   }
 };

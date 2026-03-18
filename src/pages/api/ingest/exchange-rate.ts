@@ -1,7 +1,13 @@
 import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 import { z } from "zod";
-import { jsonError, jsonOk, verifyApiKey } from "../../../lib/api/auth";
+import {
+  handleApiError,
+  jsonError,
+  jsonOk,
+  safeJsonParse,
+  verifyApiKey,
+} from "../../../lib/api/auth";
 
 const exchangeRateSchema = z.object({
   jpyPerUsd: z.number().positive(),
@@ -12,18 +18,18 @@ export const POST: APIRoute = async ({ request }) => {
   if (!verifyApiKey(request, env.INGEST_API_KEY)) {
     return jsonError(401, "Unauthorized");
   }
+
+  const parsed = await safeJsonParse(request);
+  if (!parsed.ok) return parsed.response;
+
   try {
-    const body = await request.json();
-    const data = exchangeRateSchema.parse(body);
+    const data = exchangeRateSchema.parse(parsed.data);
     await env.KV.put("exchange-rate:latest", JSON.stringify(data), {
       expirationTtl: 604800,
     });
     return jsonOk({ saved: true });
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return jsonError(400, "Validation failed", e.issues);
-    }
-    return jsonError(500, e instanceof Error ? e.message : "Internal error");
+    return handleApiError(e);
   }
 };
 
@@ -37,7 +43,7 @@ export const GET: APIRoute = async ({ request }) => {
       return jsonError(404, "No exchange rate data");
     }
     return jsonOk(JSON.parse(value));
-  } catch (e) {
-    return jsonError(500, e instanceof Error ? e.message : "Internal error");
+  } catch {
+    return jsonError(500, "Internal error");
   }
 };
