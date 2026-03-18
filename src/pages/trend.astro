@@ -11,6 +11,7 @@ import { repoToGitHubUrl } from "../lib/github";
 let ranked: any[] = [];
 let trendComment: string | null = null;
 let fetchError = false;
+const now = new Date();
 
 try {
 	const db = getDb(env.DB);
@@ -38,7 +39,6 @@ try {
 		}
 	}
 
-	const now = new Date();
 	ranked = repos
 		.map((r) => {
 			const stats = repoMap.get(r.repo);
