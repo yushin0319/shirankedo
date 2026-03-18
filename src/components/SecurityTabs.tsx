@@ -6,6 +6,7 @@ import {
   resolveReleaseDescription,
   resolveReleaseName,
 } from "../lib/security";
+import { ErrorBoundary } from "./ErrorFallback";
 
 type Vulnerability = InferSelectModel<typeof vulnerabilities>;
 type Release = InferSelectModel<typeof releases>;
@@ -25,7 +26,15 @@ type TabId = "summary" | "vulns" | "updates";
 
 const STEP = 10;
 
-export function SecurityTabs({
+export function SecurityTabs(props: SecurityTabsProps) {
+  return (
+    <ErrorBoundary>
+      <SecurityTabsInner {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function SecurityTabsInner({
   vulns,
   rels,
   repoMap,

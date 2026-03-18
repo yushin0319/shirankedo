@@ -5,7 +5,6 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { vulnerabilities, releases, securityDaily, trackingRepos, repoStats } from "../db/schema";
 import { SecurityTabs } from "../components/SecurityTabs";
-import { ErrorBoundary } from "../components/ErrorFallback";
 import { formatDisplayDate } from "../lib/date";
 import { vulnDecayScore, releaseDecayScore } from "../lib/score";
 import { sql } from "drizzle-orm";
@@ -74,14 +73,13 @@ const displayDate = formatDisplayDate(today);
 			</p>
 		</main>
 	) : (
-		<ErrorBoundary client:idle>
-			<SecurityTabs
-				vulns={vulns}
-				rels={rels}
-				repoMap={repoMap}
-				dailyComment={dailyComment}
-			/>
-		</ErrorBoundary>
+		<SecurityTabs
+			client:idle
+			vulns={vulns}
+			rels={rels}
+			repoMap={repoMap}
+			dailyComment={dailyComment}
+		/>
 	)}
 </Layout>
 

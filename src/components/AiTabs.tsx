@@ -8,6 +8,7 @@ import {
   type SortState,
   sortByKey,
 } from "../lib/sort";
+import { ErrorBoundary } from "./ErrorFallback";
 
 type LlmModel = InferSelectModel<typeof llmModels>;
 type SubscriptionPlan = InferSelectModel<typeof subscriptionPlans>;
@@ -39,7 +40,15 @@ type SubRow = {
 
 const STEP = 10;
 
-export function AiTabs({
+export function AiTabs(props: AiTabsProps) {
+  return (
+    <ErrorBoundary>
+      <AiTabsInner {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function AiTabsInner({
   models,
   plans,
   apiCommentText,
