@@ -1,0 +1,1 @@
+CREATE INDEX `repo_stats_repo_idx` ON `repo_stats` (`repo`);

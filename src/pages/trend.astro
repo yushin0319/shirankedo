@@ -38,6 +38,7 @@ try {
 		}
 	}
 
+	const now = new Date();
 	ranked = repos
 		.map((r) => {
 			const stats = repoMap.get(r.repo);
@@ -45,6 +46,7 @@ try {
 				...r,
 				stars: stats?.stars ?? 0,
 				diff: stats?.diff ?? 0,
+				isNew: isNewRepo(r.publishedAt, now),
 			};
 		})
 		.sort((a, b) => b.diff - a.diff);
@@ -61,8 +63,6 @@ try {
 	console.error("Failed to fetch trend data:", e);
 	fetchError = true;
 }
-
-const now = new Date();
 
 ---
 
@@ -100,7 +100,7 @@ const now = new Date();
 				</thead>
 				<tbody id="trend-tbody">
 					{ranked.map((r, i) => {
-						const isNew = isNewRepo(r.publishedAt, now);
+						const isNew = r.isNew;
 						return (
 							<tr class:list={[
 								"border-b border-border last:border-b-0 hover:bg-[rgba(0,0,0,.015)] transition-colors",
@@ -156,7 +156,7 @@ const now = new Date();
 		{/* SP: カード */}
 		<div class="md:hidden flex flex-col gap-3" id="trend-cards">
 			{ranked.map((r, i) => {
-				const isNew = isNewRepo(r.publishedAt, now);
+				const isNew = r.isNew;
 				return (
 					<div class:list={[
 						"bg-surface border border-border rounded-sm shadow-[2px_2px_0_rgba(0,0,0,.06)] p-4",
