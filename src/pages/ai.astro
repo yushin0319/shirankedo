@@ -5,7 +5,6 @@ import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
-import { ErrorBoundary } from "../components/ErrorFallback";
 import { formatDisplayDate } from "../lib/date";
 import { JPY_PER_USD_FALLBACK } from "../lib/constants";
 
@@ -103,16 +102,15 @@ const providerDotClass: Record<string, string> = {
 			</p>
 		</main>
 	) : (
-		<ErrorBoundary client:idle>
-			<AiTabs
-				models={models}
-				plans={plans}
-				apiCommentText={apiCommentText}
-				subCommentText={subCommentText}
-				providerDotClass={providerDotClass}
-				jpyPerUsd={jpyPerUsd}
-			/>
-		</ErrorBoundary>
+		<AiTabs
+			client:idle
+			models={models}
+			plans={plans}
+			apiCommentText={apiCommentText}
+			subCommentText={subCommentText}
+			providerDotClass={providerDotClass}
+			jpyPerUsd={jpyPerUsd}
+		/>
 	)}
 </Layout>
 
