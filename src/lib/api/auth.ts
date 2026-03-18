@@ -39,3 +39,72 @@ export function handleApiError(e: unknown): Response {
   }
   return jsonError(500, "Internal error");
 }
+
+// --- ラッパー関数 ---
+
+import { env } from "cloudflare:workers";
+import { type AppDatabase, getDb } from "../../db/client";
+
+type DbHandler = (db: AppDatabase, request: Request) => Promise<Response>;
+
+type PostHandler = (db: AppDatabase, data: unknown) => Promise<Response>;
+
+type NoDbHandler = (request: Request) => Promise<Response>;
+
+/**
+ * GET用ラッパー: 認証 → DB初期化 → ハンドラ → エラーハンドリング
+ */
+export function apiGet(
+  handler: DbHandler,
+): (ctx: { request: Request }) => Promise<Response> {
+  return async ({ request }) => {
+    if (!verifyApiKey(request, env.INGEST_API_KEY)) {
+      return jsonError(401, "Unauthorized");
+    }
+    try {
+      const db = getDb(env.DB);
+      return await handler(db, request);
+    } catch (e) {
+      return handleApiError(e);
+    }
+  };
+}
+
+/**
+ * POST用ラッパー: 認証 → JSONパース → DB初期化 → ハンドラ → エラーハンドリング
+ */
+export function apiPost(
+  handler: PostHandler,
+): (ctx: { request: Request }) => Promise<Response> {
+  return async ({ request }) => {
+    if (!verifyApiKey(request, env.INGEST_API_KEY)) {
+      return jsonError(401, "Unauthorized");
+    }
+    const parsed = await safeJsonParse(request);
+    if (!parsed.ok) return parsed.response;
+    try {
+      const db = getDb(env.DB);
+      return await handler(db, parsed.data);
+    } catch (e) {
+      return handleApiError(e);
+    }
+  };
+}
+
+/**
+ * DB不要のエンドポイント用ラッパー: 認証 → ハンドラ → エラーハンドリング
+ */
+export function apiNoDb(
+  handler: NoDbHandler,
+): (ctx: { request: Request }) => Promise<Response> {
+  return async ({ request }) => {
+    if (!verifyApiKey(request, env.INGEST_API_KEY)) {
+      return jsonError(401, "Unauthorized");
+    }
+    try {
+      return await handler(request);
+    } catch (e) {
+      return handleApiError(e);
+    }
+  };
+}
