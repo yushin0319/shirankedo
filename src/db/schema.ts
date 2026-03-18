@@ -84,15 +84,21 @@ export const securityDaily = sqliteTable("security_daily", {
   updatedAt: text("updated_at"),
 });
 
-// LLMモデル（現在の状態）
-export const llmModels = sqliteTable("llm_models", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  modelName: text("model_name").unique().notNull(),
+// LLMモデル共通カラム（現在テーブルと履歴テーブルで共有）
+const llmModelDataColumns = {
+  modelName: text("model_name").notNull(),
   provider: text("provider").notNull(),
   score: real("score"),
   inputPrice: real("input_price").notNull(),
   outputPrice: real("output_price").notNull(),
   currency: text("currency").notNull().default("USD"),
+};
+
+// LLMモデル（現在の状態）
+export const llmModels = sqliteTable("llm_models", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  ...llmModelDataColumns,
+  modelName: text("model_name").unique().notNull(),
   createdAt: text("created_at").default(sql`(datetime('now'))`),
   updatedAt: text("updated_at"),
 });
@@ -100,27 +106,27 @@ export const llmModels = sqliteTable("llm_models", {
 // LLMモデル変更履歴
 export const llmModelHistory = sqliteTable("llm_model_history", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  modelName: text("model_name").notNull(),
-  provider: text("provider").notNull(),
-  score: real("score"),
-  inputPrice: real("input_price").notNull(),
-  outputPrice: real("output_price").notNull(),
-  currency: text("currency").notNull().default("USD"),
+  ...llmModelDataColumns,
   changedAt: text("changed_at").notNull(),
 });
+
+// サブスクプラン共通カラム（現在テーブルと履歴テーブルで共有）
+const subscriptionPlanDataColumns = {
+  provider: text("provider").notNull(),
+  service: text("service").notNull(),
+  planName: text("plan_name").notNull(),
+  price: real("price").notNull(),
+  currency: text("currency").notNull().default("USD"),
+  models: text("models").notNull(), // JSON配列
+  limits: text("limits"),
+};
 
 // サブスクプラン
 export const subscriptionPlans = sqliteTable(
   "subscription_plans",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    provider: text("provider").notNull(),
-    service: text("service").notNull(),
-    planName: text("plan_name").notNull(),
-    price: real("price").notNull(),
-    currency: text("currency").notNull().default("USD"),
-    models: text("models").notNull(), // JSON配列
-    limits: text("limits"),
+    ...subscriptionPlanDataColumns,
     createdAt: text("created_at").default(sql`(datetime('now'))`),
     updatedAt: text("updated_at"),
   },
@@ -137,13 +143,7 @@ export const subscriptionPlanHistory = sqliteTable(
   "subscription_plan_history",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    provider: text("provider").notNull(),
-    service: text("service").notNull(),
-    planName: text("plan_name").notNull(),
-    price: real("price").notNull(),
-    currency: text("currency").notNull().default("USD"),
-    models: text("models").notNull(),
-    limits: text("limits"),
+    ...subscriptionPlanDataColumns,
     changedAt: text("changed_at").notNull(),
   },
 );
