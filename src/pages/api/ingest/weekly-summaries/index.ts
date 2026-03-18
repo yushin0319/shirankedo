@@ -1,23 +1,28 @@
 import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
-import { z } from "zod";
 import { getDb } from "../../../../db/client";
-import { jsonError, jsonOk, verifyApiKey } from "../../../../lib/api/auth";
+import {
+  handleApiError,
+  jsonError,
+  jsonOk,
+  safeJsonParse,
+  verifyApiKey,
+} from "../../../../lib/api/auth";
 import { processWeeklySummary } from "../../../../lib/api/ingest-simple";
 
 export const POST: APIRoute = async ({ request }) => {
   if (!verifyApiKey(request, env.INGEST_API_KEY)) {
     return jsonError(401, "Unauthorized");
   }
+
+  const parsed = await safeJsonParse(request);
+  if (!parsed.ok) return parsed.response;
+
   try {
-    const body = await request.json();
     const db = getDb(env.DB);
-    const result = await processWeeklySummary(db, body);
+    const result = await processWeeklySummary(db, parsed.data);
     return jsonOk(result);
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return jsonError(400, "Validation failed", e.issues);
-    }
-    return jsonError(500, e instanceof Error ? e.message : "Internal error");
+    return handleApiError(e);
   }
 };
