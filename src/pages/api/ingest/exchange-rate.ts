@@ -2,11 +2,10 @@ import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
 import { z } from "zod";
 import {
-  handleApiError,
+  apiNoDb,
   jsonError,
   jsonOk,
   safeJsonParse,
-  verifyApiKey,
 } from "../../../lib/api/auth";
 
 const exchangeRateSchema = z.object({
@@ -14,36 +13,21 @@ const exchangeRateSchema = z.object({
   updatedAt: z.string().min(1),
 });
 
-export const POST: APIRoute = async ({ request }) => {
-  if (!verifyApiKey(request, env.INGEST_API_KEY)) {
-    return jsonError(401, "Unauthorized");
-  }
-
+export const POST: APIRoute = apiNoDb(async (request) => {
   const parsed = await safeJsonParse(request);
   if (!parsed.ok) return parsed.response;
 
-  try {
-    const data = exchangeRateSchema.parse(parsed.data);
-    await env.KV.put("exchange-rate:latest", JSON.stringify(data), {
-      expirationTtl: 604800,
-    });
-    return jsonOk({ saved: true });
-  } catch (e) {
-    return handleApiError(e);
-  }
-};
+  const data = exchangeRateSchema.parse(parsed.data);
+  await env.KV.put("exchange-rate:latest", JSON.stringify(data), {
+    expirationTtl: 604800,
+  });
+  return jsonOk({ saved: true });
+});
 
-export const GET: APIRoute = async ({ request }) => {
-  if (!verifyApiKey(request, env.INGEST_API_KEY)) {
-    return jsonError(401, "Unauthorized");
+export const GET: APIRoute = apiNoDb(async () => {
+  const value = await env.KV.get("exchange-rate:latest");
+  if (!value) {
+    return jsonError(404, "No exchange rate data");
   }
-  try {
-    const value = await env.KV.get("exchange-rate:latest");
-    if (!value) {
-      return jsonError(404, "No exchange rate data");
-    }
-    return jsonOk(JSON.parse(value));
-  } catch {
-    return jsonError(500, "Internal error");
-  }
-};
+  return jsonOk(JSON.parse(value));
+});
