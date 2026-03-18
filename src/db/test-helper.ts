@@ -31,6 +31,15 @@ export function createTestDbWithTables() {
   const { db, sqlite } = createTestDb();
   sqlite.exec(loadMigrationSQL());
   // BetterSQLite3Database と DrizzleD1Database はクエリ API 互換
-  // batch() はテストで使わないため安全にキャスト
-  return { db: db as unknown as AppDatabase, sqlite };
+  // batch() は D1 専用のため、テスト用に逐次実行 shim を追加
+  const dbWithBatch = Object.assign(db, {
+    batch: async (queries: unknown[]) => {
+      const results = [];
+      for (const q of queries) {
+        results.push(await q);
+      }
+      return results;
+    },
+  });
+  return { db: dbWithBatch as unknown as AppDatabase, sqlite };
 }
