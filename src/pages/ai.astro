@@ -7,6 +7,7 @@ import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
 import { ErrorBoundary } from "../components/ErrorFallback";
 import { formatDisplayDate } from "../lib/date";
+import { JPY_PER_USD_FALLBACK } from "../lib/constants";
 
 let models: any[] = [];
 let plans: any[] = [];
@@ -48,8 +49,8 @@ try {
 	fetchError = true;
 }
 
-// KVから為替レートを取得（フォールバック: 150円）
-let jpyPerUsd = 150;
+// KVから為替レートを取得（フォールバック値は constants.ts）
+let jpyPerUsd = JPY_PER_USD_FALLBACK;
 try {
 	const raw = await env.KV.get("exchange-rate:latest");
 	if (raw) {

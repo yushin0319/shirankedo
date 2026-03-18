@@ -1,4 +1,4 @@
-const DECAY_RATE = 0.85;
+import { DECAY_RATE, MAJOR_RELEASE_MULTIPLIER } from "./constants";
 
 /** 日付文字列から経過日数を算出（0以上） */
 function daysSince(publishedAt: string, now: Date = new Date()): number {
@@ -7,7 +7,7 @@ function daysSince(publishedAt: string, now: Date = new Date()): number {
   return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
 }
 
-/** ニュース記事の時間減衰スコア: impact × 0.94^(経過日数) */
+/** ニュース記事の時間減衰スコア: impact × DECAY_RATE^(経過日数) */
 export function articleDecayScore(
   impact: number,
   publishedAt: string,
@@ -16,7 +16,7 @@ export function articleDecayScore(
   return impact * DECAY_RATE ** daysSince(publishedAt, now);
 }
 
-/** 脆弱性の時間減衰スコア: cvssScore × 0.94^(経過日数) */
+/** 脆弱性の時間減衰スコア: cvssScore × DECAY_RATE^(経過日数) */
 export function vulnDecayScore(
   cvssScore: number | null,
   publishedAt: string,
@@ -26,13 +26,13 @@ export function vulnDecayScore(
   return cvssScore * DECAY_RATE ** daysSince(publishedAt, now);
 }
 
-/** リリースの時間減衰スコア: stars × (major ? 2 : 1) × 0.94^(経過日数) */
+/** リリースの時間減衰スコア: stars × (major倍率) × DECAY_RATE^(経過日数) */
 export function releaseDecayScore(
   stars: number,
   type: string,
   publishedAt: string,
   now?: Date,
 ): number {
-  const multiplier = type === "major" ? 2 : 1;
+  const multiplier = type === "major" ? MAJOR_RELEASE_MULTIPLIER : 1;
   return stars * multiplier * DECAY_RATE ** daysSince(publishedAt, now);
 }

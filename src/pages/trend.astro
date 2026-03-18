@@ -7,6 +7,7 @@ import { trackingRepos, repoStats, pageComments } from "../db/schema";
 import { isNewRepo } from "../lib/trend";
 import { formatDisplayDate } from "../lib/date";
 import { repoToGitHubUrl } from "../lib/github";
+import { TREND_LOOKBACK_DAYS } from "../lib/constants";
 
 let ranked: any[] = [];
 let trendComment: string | null = null;
@@ -17,9 +18,9 @@ try {
 
 	const repos = await db.select().from(trackingRepos);
 
-	const twoWeeksAgo = new Date();
-	twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 15);
-	const cutoff = twoWeeksAgo.toISOString().slice(0, 10);
+	const lookback = new Date();
+	lookback.setDate(lookback.getDate() - TREND_LOOKBACK_DAYS);
+	const cutoff = lookback.toISOString().slice(0, 10);
 
 	const latestStats = await db
 		.select()
@@ -249,7 +250,8 @@ const now = new Date();
 </style>
 
 <script>
-	const STEP = 10;
+	import { PAGE_STEP } from "../lib/constants";
+	const STEP = PAGE_STEP;
 
 	// PC: もっと見る（10件ずつ追加）
 	const trendMore = document.getElementById("trend-more");
