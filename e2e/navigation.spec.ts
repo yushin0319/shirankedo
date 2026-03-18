@@ -1,14 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
-
-async function gotoWithRetry(page: Page, path: string) {
-  for (let i = 0; i < 3; i++) {
-    await page.goto(path, { waitUntil: "networkidle" });
-    const error = await page.locator('text="An error occurred."').count();
-    if (error === 0) return;
-    await page.waitForTimeout(3000);
-  }
-  throw new Error("ページの読み込みに失敗しました");
-}
+import { expect, test } from "@playwright/test";
+import { gotoWithRetry } from "./helpers";
 
 test.describe("ナビゲーション", () => {
   test("各ページへのナビゲーションリンクが機能する", async ({ page }) => {
