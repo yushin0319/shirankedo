@@ -1,4 +1,6 @@
-// 相対日時表示（「たった今」「N時間前」「N日前」、7日超は生の日付）
+import { RELATIVE_DATE_DAYS } from "./constants";
+
+// 相対日時表示（「たった今」「N時間前」「N日前」、閾値超は生の日付）
 export function formatRelativeDate(isoString: string): string {
   const date = new Date(isoString);
   const now = new Date();
@@ -10,7 +12,7 @@ export function formatRelativeDate(isoString: string): string {
   if (diffMin < 1) return "たった今";
   if (diffHour < 1) return `${diffMin}分前`;
   if (diffDay < 1) return `${diffHour}時間前`;
-  if (diffDay <= 7) return `${diffDay}日前`;
+  if (diffDay <= RELATIVE_DATE_DAYS) return `${diffDay}日前`;
   return isoString.slice(0, 10);
 }
 

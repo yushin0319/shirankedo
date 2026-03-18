@@ -95,7 +95,8 @@ const today = new Date().toISOString().slice(0, 10);
 </style>
 
 <script>
-	const STEP = 10;
+	import { PAGE_STEP } from "../lib/constants";
+	const STEP = PAGE_STEP;
 	const loadMore = document.getElementById("load-more");
 	const filterReset = document.getElementById("filter-reset");
 	const allCards = document.querySelectorAll<HTMLElement>("#news-list > div");
