@@ -1,4 +1,5 @@
 // 変更検知付き UPSERT（llm-models, subscription-plans）
+// 書き込み操作は db.batch() でアトミックに実行
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "../../db/client";
@@ -10,7 +11,10 @@ import {
 } from "../../db/schema";
 import { llmModelSchema, subscriptionPlanSchema } from "./schemas";
 
-/** LLM モデル: UPSERT + 変更検知 → history */
+// db.batch() に渡せるクエリの型
+type BatchQuery = Parameters<AppDatabase["batch"]>[0][number];
+
+/** LLM モデル: UPSERT + 変更検知 → history（batch で一括書き込み） */
 export async function processLlmModels(
   db: AppDatabase,
   data: unknown[],
@@ -28,6 +32,7 @@ export async function processLlmModels(
   let inserted = 0;
   let updated = 0;
   let historyCreated = 0;
+  const writes: BatchQuery[] = [];
 
   for (const item of parsed) {
     const old = existingMap.get(item.modelName);
@@ -40,41 +45,47 @@ export async function processLlmModels(
         old.provider !== item.provider;
 
       if (changed) {
-        // 旧値を history に保存
-        await db.insert(llmModelHistory).values({
-          modelName: old.modelName,
-          provider: old.provider,
-          score: old.score,
-          inputPrice: old.inputPrice,
-          outputPrice: old.outputPrice,
-          currency: old.currency,
-          changedAt: new Date().toISOString(),
-        });
+        // 旧値を history に保存 + 本テーブルを更新
+        writes.push(
+          db.insert(llmModelHistory).values({
+            modelName: old.modelName,
+            provider: old.provider,
+            score: old.score,
+            inputPrice: old.inputPrice,
+            outputPrice: old.outputPrice,
+            currency: old.currency,
+            changedAt: new Date().toISOString(),
+          }),
+        );
+        writes.push(
+          db
+            .update(llmModels)
+            .set({
+              provider: item.provider,
+              score: item.score,
+              inputPrice: item.inputPrice,
+              outputPrice: item.outputPrice,
+              currency: item.currency,
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(llmModels.modelName, item.modelName)),
+        );
         historyCreated++;
-
-        // 本テーブルを更新
-        await db
-          .update(llmModels)
-          .set({
-            provider: item.provider,
-            score: item.score,
-            inputPrice: item.inputPrice,
-            outputPrice: item.outputPrice,
-            currency: item.currency,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(llmModels.modelName, item.modelName));
         updated++;
       }
     } else {
-      await db.insert(llmModels).values(item);
+      writes.push(db.insert(llmModels).values(item));
       inserted++;
     }
+  }
+
+  if (writes.length > 0) {
+    await db.batch(writes as [BatchQuery, ...BatchQuery[]]);
   }
   return { inserted, updated, historyCreated };
 }
 
-/** サブスクプラン: UPSERT + 変更検知 → history */
+/** サブスクプラン: UPSERT + 変更検知 → history（batch で一括書き込み） */
 export async function processSubscriptionPlans(
   db: AppDatabase,
   data: unknown[],
@@ -94,6 +105,7 @@ export async function processSubscriptionPlans(
   let inserted = 0;
   let updated = 0;
   let historyCreated = 0;
+  const writes: BatchQuery[] = [];
 
   for (const item of parsed) {
     const key = `${item.service}:${item.planName}`;
@@ -106,35 +118,42 @@ export async function processSubscriptionPlans(
         old.provider !== item.provider;
 
       if (changed) {
-        await db.insert(subscriptionPlanHistory).values({
-          provider: old.provider,
-          service: old.service,
-          planName: old.planName,
-          price: old.price,
-          currency: old.currency,
-          models: old.models,
-          limits: old.limits,
-          changedAt: new Date().toISOString(),
-        });
+        writes.push(
+          db.insert(subscriptionPlanHistory).values({
+            provider: old.provider,
+            service: old.service,
+            planName: old.planName,
+            price: old.price,
+            currency: old.currency,
+            models: old.models,
+            limits: old.limits,
+            changedAt: new Date().toISOString(),
+          }),
+        );
+        writes.push(
+          db
+            .update(subscriptionPlans)
+            .set({
+              provider: item.provider,
+              price: item.price,
+              currency: item.currency,
+              models: item.models,
+              limits: item.limits,
+              updatedAt: new Date().toISOString(),
+            })
+            .where(eq(subscriptionPlans.id, old.id)),
+        );
         historyCreated++;
-
-        await db
-          .update(subscriptionPlans)
-          .set({
-            provider: item.provider,
-            price: item.price,
-            currency: item.currency,
-            models: item.models,
-            limits: item.limits,
-            updatedAt: new Date().toISOString(),
-          })
-          .where(eq(subscriptionPlans.id, old.id));
         updated++;
       }
     } else {
-      await db.insert(subscriptionPlans).values(item);
+      writes.push(db.insert(subscriptionPlans).values(item));
       inserted++;
     }
+  }
+
+  if (writes.length > 0) {
+    await db.batch(writes as [BatchQuery, ...BatchQuery[]]);
   }
   return { inserted, updated, historyCreated };
 }
