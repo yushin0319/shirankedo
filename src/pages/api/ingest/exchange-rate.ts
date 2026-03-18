@@ -10,6 +10,7 @@ import {
 
 const exchangeRateSchema = z.object({
   jpyPerUsd: z.number().positive(),
+  jpyPerEur: z.number().positive().optional(),
   updatedAt: z.string().min(1),
 });
 

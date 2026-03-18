@@ -20,3 +20,6 @@ export const PAGE_STEP = 10;
 
 /** 為替レート JPY/USD のフォールバック値 */
 export const JPY_PER_USD_FALLBACK = 150;
+
+/** 為替レート JPY/EUR のフォールバック値 */
+export const JPY_PER_EUR_FALLBACK = 163;

@@ -6,7 +6,7 @@ import { getDb } from "../db/client";
 import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
 import { formatDisplayDate } from "../lib/date";
-import { JPY_PER_USD_FALLBACK } from "../lib/constants";
+import { JPY_PER_USD_FALLBACK, JPY_PER_EUR_FALLBACK } from "../lib/constants";
 
 let models: any[] = [];
 let plans: any[] = [];
@@ -50,12 +50,16 @@ try {
 
 // KVから為替レートを取得（フォールバック値は constants.ts）
 let jpyPerUsd = JPY_PER_USD_FALLBACK;
+let jpyPerEur = JPY_PER_EUR_FALLBACK;
 try {
 	const raw = await env.KV.get("exchange-rate:latest");
 	if (raw) {
 		const parsed = JSON.parse(raw);
 		if (typeof parsed.jpyPerUsd === "number" && parsed.jpyPerUsd > 0) {
 			jpyPerUsd = parsed.jpyPerUsd;
+		}
+		if (typeof parsed.jpyPerEur === "number" && parsed.jpyPerEur > 0) {
+			jpyPerEur = parsed.jpyPerEur;
 		}
 	}
 } catch {
@@ -110,6 +114,7 @@ const providerDotClass: Record<string, string> = {
 			subCommentText={subCommentText}
 			providerDotClass={providerDotClass}
 			jpyPerUsd={jpyPerUsd}
+			jpyPerEur={jpyPerEur}
 		/>
 	)}
 </Layout>

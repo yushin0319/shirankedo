@@ -1,7 +1,12 @@
 import type { InferSelectModel } from "drizzle-orm";
 import { useMemo, useState } from "react";
 import type { llmModels, subscriptionPlans } from "../db/schema";
-import { estimateMonthly, getTier, parseModels } from "../lib/ai";
+import {
+  estimateMonthly,
+  formatSubPrice,
+  getTier,
+  parseModels,
+} from "../lib/ai";
 import {
   getProviderGapIndices,
   nextSortState,
@@ -20,6 +25,7 @@ type AiTabsProps = {
   subCommentText: string | null;
   providerDotClass: Record<string, string>;
   jpyPerUsd?: number;
+  jpyPerEur?: number;
 };
 
 type ApiRow = {
@@ -55,6 +61,7 @@ function AiTabsInner({
   subCommentText,
   providerDotClass,
   jpyPerUsd = 150,
+  jpyPerEur = 163,
 }: AiTabsProps) {
   const [activeTab, setActiveTab] = useState<"text" | "sub">("text");
   const [apiSort, setApiSort] = useState<SortState>({
@@ -114,16 +121,11 @@ function AiTabsInner({
     () =>
       plans.map((p) => ({
         plan: p,
-        priceStr:
-          p.price === 0
-            ? "¥0"
-            : p.currency === "JPY"
-              ? `¥${p.price.toLocaleString()}`
-              : `$${p.price}`,
+        priceStr: formatSubPrice(p.price, p.currency, jpyPerUsd, jpyPerEur),
         modelList: parseModels(p.models),
         dotClass: providerDotClass[p.provider] ?? "",
       })),
-    [plans, providerDotClass],
+    [plans, providerDotClass, jpyPerUsd, jpyPerEur],
   );
 
   // ソート済みサブスク行
