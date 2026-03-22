@@ -129,10 +129,86 @@ const navItems = [
 				hamburger.setAttribute("aria-expanded", String(!isOpen));
 				mobileNav?.setAttribute("aria-hidden", String(isOpen));
 			});
+
+			// セクション間フリック切り替え
+			const SECTIONS = ["/", "/security", "/trend", "/ai"];
+			const SWIPE_THRESHOLD = 50;
+			let touchStart: { x: number; y: number } | null = null;
+
+			document.addEventListener("touchstart", (e) => {
+				const touch = e.touches[0];
+				touchStart = { x: touch.clientX, y: touch.clientY };
+			});
+
+			document.addEventListener("touchend", (e) => {
+				if (!touchStart) return;
+				const touch = e.changedTouches[0];
+				const dx = touch.clientX - touchStart.x;
+				const dy = touch.clientY - touchStart.y;
+				touchStart = null;
+
+				if (Math.abs(dy) > Math.abs(dx)) return;
+				if (Math.abs(dx) < SWIPE_THRESHOLD) return;
+
+				const target = e.target as HTMLElement;
+				if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+
+				const idx = SECTIONS.indexOf(window.location.pathname);
+				if (idx === -1) return;
+
+				let nextIdx = -1;
+				if (dx < 0 && idx < SECTIONS.length - 1) nextIdx = idx + 1;
+				else if (dx > 0 && idx > 0) nextIdx = idx - 1;
+				if (nextIdx === -1) return;
+
+				const nextUrl = SECTIONS[nextIdx];
+				const direction = nextIdx > idx ? "left" : "right";
+
+				// クロスドキュメント View Transitions 用にセッションストレージで方向を渡す
+				sessionStorage.setItem("swipe-direction", direction);
+				window.location.href = nextUrl;
+			});
+
+			// ページ表示時: セッションストレージから方向を取得してアニメーション適用
+			const dir = sessionStorage.getItem("swipe-direction");
+			if (dir) {
+				sessionStorage.removeItem("swipe-direction");
+				document.documentElement.dataset.swipeDirection = dir;
+				requestAnimationFrame(() => {
+					document.documentElement.classList.add("swipe-animate");
+					document.documentElement.addEventListener("animationend", () => {
+						document.documentElement.classList.remove("swipe-animate");
+						delete document.documentElement.dataset.swipeDirection;
+					}, { once: true });
+				});
+			}
 		</script>
 	</body>
 </html>
 
 <style is:global>
 	@import "../styles/global.css";
+
+	/* セクション間フリック: スライドインアニメーション */
+	html.swipe-animate[data-swipe-direction="left"] body {
+		animation: slide-in-right 250ms ease-out;
+	}
+	html.swipe-animate[data-swipe-direction="right"] body {
+		animation: slide-in-left 250ms ease-out;
+	}
+
+	@keyframes slide-in-right {
+		from { opacity: 0; transform: translateX(80px); }
+		to { opacity: 1; transform: translateX(0); }
+	}
+	@keyframes slide-in-left {
+		from { opacity: 0; transform: translateX(-80px); }
+		to { opacity: 1; transform: translateX(0); }
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		html.swipe-animate body {
+			animation: none;
+		}
+	}
 </style>
