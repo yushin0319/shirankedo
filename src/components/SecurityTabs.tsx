@@ -128,8 +128,16 @@ function SecurityTabsInner({
                   {v.title}
                 </div>
                 <div className="font-mono text-[10px] text-muted mt-0.5">
-                  {v.cveId}&nbsp;&middot;&nbsp;CVSS{" "}
-                  {v.cvssScore?.toFixed(1) ?? "—"}&nbsp;&middot;&nbsp;
+                  <a
+                    href={`https://nvd.nist.gov/vuln/detail/${v.cveId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted hover:text-ink transition-colors"
+                  >
+                    {v.cveId}
+                  </a>
+                  &nbsp;&middot;&nbsp;CVSS {v.cvssScore?.toFixed(1) ?? "—"}
+                  &nbsp;&middot;&nbsp;
                   {formatDate(v.publishedAt)}
                 </div>
               </div>
@@ -163,7 +171,14 @@ function SecurityTabsInner({
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] font-bold text-ink leading-normal flex items-baseline gap-2">
-                    {name}
+                    <a
+                      href={`https://github.com/${r.repo}/releases`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink hover:text-muted transition-colors"
+                    >
+                      {name}
+                    </a>
                     {isMajor && (
                       <span className="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-major-bg text-major-text">
                         MAJOR
@@ -237,9 +252,14 @@ function SecurityTabsInner({
             >
               <div className="absolute top-0 left-0 w-0.75 h-full rounded-l-sm bg-critical" />
               <div className="flex items-center gap-2.5 mb-2 flex-wrap">
-                <span className="font-mono text-[11px] font-medium text-ink tracking-[.04em]">
+                <a
+                  href={`https://nvd.nist.gov/vuln/detail/${v.cveId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-[11px] font-medium text-ink tracking-[.04em] hover:text-muted transition-colors"
+                >
                   {v.cveId}
-                </span>
+                </a>
                 {v.cvssScore && (
                   <span className="font-mono text-[10px] tracking-[.04em] text-critical">
                     CVSS {v.cvssScore.toFixed(1)}
@@ -319,7 +339,14 @@ function SecurityTabsInner({
                 )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[14px] font-bold text-ink leading-[1.4] tracking-[-0.01em] flex items-baseline gap-2">
-                    {name}
+                    <a
+                      href={`https://github.com/${r.repo}/releases`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-ink hover:text-muted transition-colors"
+                    >
+                      {name}
+                    </a>
                     {isMajor && (
                       <span className="font-mono text-[9px] tracking-[.08em] px-2 py-0.5 rounded-sm bg-major-bg text-major-text">
                         MAJOR
