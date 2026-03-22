@@ -19,7 +19,7 @@ type RepoInput = {
 type StatInput = {
   repo: string;
   stars: number;
-  createdAt: string;
+  createdAt: string | null;
 };
 
 type RankedRepo<T extends RepoInput> = T & {
