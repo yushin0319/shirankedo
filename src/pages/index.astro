@@ -5,8 +5,8 @@ import NewsCard from "../components/NewsCard.astro";
 import { getDb } from "../db/client";
 import { articles } from "../db/schema";
 import { formatDisplayDate } from "../lib/date";
-import { dedupeByTitle } from "../lib/articles";
-import { articleDecayScore } from "../lib/score";
+import { topArticles } from "../lib/articles";
+import { FETCH_LIMIT } from "../lib/constants";
 
 let rows: any[] = [];
 let fetchError = false;
@@ -15,9 +15,7 @@ try {
 	const db = getDb(env.DB);
 	const allRows = await db.select().from(articles);
 	const now = new Date();
-	rows = dedupeByTitle(allRows).sort(
-		(a, b) => articleDecayScore(b.impact, b.publishedAt, now) - articleDecayScore(a.impact, a.publishedAt, now),
-	);
+	rows = topArticles(allRows, FETCH_LIMIT, now);
 } catch (e) {
 	console.error("Failed to fetch articles:", e);
 	fetchError = true;

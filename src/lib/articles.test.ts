@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dedupeByTitle } from "./articles";
+import { dedupeByTitle, topArticles } from "./articles";
 
 interface Article {
   title: string;
@@ -57,5 +57,35 @@ describe("dedupeByTitle", () => {
     const original = [...input];
     dedupeByTitle(input);
     expect(input).toEqual(original);
+  });
+});
+
+describe("topArticles", () => {
+  const now = new Date("2026-03-15");
+
+  it("重複排除後、decayScore降順でlimit件返す", () => {
+    const input = [
+      make("低スコア", "https://a.com", 1, "2026-03-10"),
+      make("高スコア", "https://b.com", 10, "2026-03-15"),
+      make("中スコア", "https://c.com", 5, "2026-03-14"),
+      make("高スコア", "https://d.com", 10, "2026-03-15"), // 重複
+    ];
+    const result = topArticles(input, 2, now);
+    expect(result).toHaveLength(2);
+    expect(result[0].title).toBe("高スコア");
+    expect(result[1].title).toBe("中スコア");
+  });
+
+  it("記事数がlimit未満の場合、全件返る", () => {
+    const input = [
+      make("A", "https://a.com", 5),
+      make("B", "https://b.com", 3),
+    ];
+    const result = topArticles(input, 50, now);
+    expect(result).toHaveLength(2);
+  });
+
+  it("空配列で空配列を返す", () => {
+    expect(topArticles([], 50, now)).toEqual([]);
   });
 });
