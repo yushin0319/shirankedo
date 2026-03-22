@@ -35,21 +35,48 @@ export const onRequest = defineMiddleware(async (_ctx, next) => {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
   );
-  response.headers.set(
-    "Content-Security-Policy",
-    [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: https:",
-      "font-src 'self' https://fonts.gstatic.com",
-      "connect-src 'self'",
-      "frame-ancestors 'none'",
-    ].join("; "),
-  );
+  // Astro自動CSPが生成したヘッダーに、不足ディレクティブを補完
+  const csp = response.headers.get("Content-Security-Policy") ?? "";
+  if (csp) {
+    const patched = patchCsp(csp, {
+      "style-src": ["https://fonts.googleapis.com"],
+      "font-src": ["'self'", "https://fonts.gstatic.com"],
+      "img-src": ["'self'", "data:", "https:"],
+      "connect-src": ["'self'"],
+      "frame-ancestors": ["'none'"],
+    });
+    response.headers.set("Content-Security-Policy", patched);
+  }
 
   return response;
 });
+
+/** AstroのCSPヘッダーに不足ディレクティブを追記・補完する */
+function patchCsp(csp: string, additions: Record<string, string[]>): string {
+  const directives = new Map<string, string>();
+  for (const part of csp.split(";")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const spaceIdx = trimmed.indexOf(" ");
+    const key = spaceIdx === -1 ? trimmed : trimmed.slice(0, spaceIdx);
+    directives.set(key, trimmed);
+  }
+
+  for (const [key, values] of Object.entries(additions)) {
+    const existing = directives.get(key);
+    if (existing) {
+      // 既存ディレクティブに不足分を追記
+      const newValues = values.filter((v) => !existing.includes(v));
+      if (newValues.length > 0) {
+        directives.set(key, `${existing} ${newValues.join(" ")}`);
+      }
+    } else {
+      directives.set(key, `${key} ${values.join(" ")}`);
+    }
+  }
+
+  return [...directives.values()].join("; ");
+}
 
 /** 現在の分（UTC）をキー用文字列で返す */
 function currentMinute(): string {
