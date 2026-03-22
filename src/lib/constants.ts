@@ -18,6 +18,12 @@ export const MAJOR_RELEASE_MULTIPLIER = 2;
 /** 「もっと見る」のページング単位 */
 export const PAGE_STEP = 10;
 
+/** サーバー側データ取得の上限件数 */
+export const FETCH_LIMIT = 50;
+
+/** フロント表示の上限件数（これ以上は「もっと見る」を出さない） */
+export const DISPLAY_CAP = 100;
+
 /** 為替レート JPY/USD のフォールバック値 */
 export const JPY_PER_USD_FALLBACK = 150;
 

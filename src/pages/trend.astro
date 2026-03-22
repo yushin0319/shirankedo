@@ -4,10 +4,10 @@ import { desc, sql } from "drizzle-orm";
 import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
 import { trackingRepos, repoStats, pageComments } from "../db/schema";
-import { isNewRepo } from "../lib/trend";
+import { isNewRepo, rankTrendRepos } from "../lib/trend";
 import { formatDisplayDate } from "../lib/date";
 import { repoToGitHubUrl } from "../lib/github";
-import { TREND_LOOKBACK_DAYS } from "../lib/constants";
+import { TREND_LOOKBACK_DAYS, FETCH_LIMIT } from "../lib/constants";
 
 let ranked: any[] = [];
 let trendComment: string | null = null;
@@ -29,28 +29,10 @@ try {
 		.where(sql`${repoStats.createdAt} >= ${cutoff}`)
 		.orderBy(desc(repoStats.createdAt));
 
-	const repoMap = new Map<string, { stars: number; prevStars: number; diff: number }>();
-	for (const stat of latestStats) {
-		const existing = repoMap.get(stat.repo);
-		if (!existing) {
-			repoMap.set(stat.repo, { stars: stat.stars, prevStars: 0, diff: 0 });
-		} else if (existing.prevStars === 0) {
-			existing.prevStars = stat.stars;
-			existing.diff = existing.stars - stat.stars;
-		}
-	}
-
-	ranked = repos
-		.map((r) => {
-			const stats = repoMap.get(r.repo);
-			return {
-				...r,
-				stars: stats?.stars ?? 0,
-				diff: stats?.diff ?? 0,
-				isNew: isNewRepo(r.publishedAt, now),
-			};
-		})
-		.sort((a, b) => b.diff - a.diff);
+	ranked = rankTrendRepos(repos, latestStats, FETCH_LIMIT).map((r) => ({
+		...r,
+		isNew: isNewRepo(r.publishedAt, now),
+	}));
 
 	const comment = await db
 		.select()
