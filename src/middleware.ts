@@ -65,8 +65,9 @@ function patchCsp(csp: string, additions: Record<string, string[]>): string {
   for (const [key, values] of Object.entries(additions)) {
     const existing = directives.get(key);
     if (existing) {
-      // 既存ディレクティブに不足分を追記
-      const newValues = values.filter((v) => !existing.includes(v));
+      // 既存ディレクティブに不足分を追記（トークン単位で比較）
+      const existingSources = existing.split(" ").slice(1);
+      const newValues = values.filter((v) => !existingSources.includes(v));
       if (newValues.length > 0) {
         directives.set(key, `${existing} ${newValues.join(" ")}`);
       }
