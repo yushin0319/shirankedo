@@ -22,6 +22,20 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Smoke test
+        run: |
+          for url in \
+            "https://shirankedo.y-fudo.workers.dev/" \
+            "https://shirankedo.y-fudo.workers.dev/security" \
+            "https://shirankedo.y-fudo.workers.dev/ai" \
+            "https://shirankedo.y-fudo.workers.dev/trend"; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' "$url")
+            if [ "$status" -ne 200 ]; then
+              echo "FAIL: $url returned $status"
+              exit 1
+            fi
+            echo "OK: $url → $status"
+          done
       - name: Notify Discord on failure
         if: failure()
         run: |
