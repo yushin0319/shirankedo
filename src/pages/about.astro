@@ -11,30 +11,38 @@ import Layout from "../layouts/Layout.astro";
 		<section class="mb-8">
 			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">About</h2>
 			<p class="text-[14px] leading-[1.8] text-ink">
-				テック界隈で今日起きたことを3分で把握するダッシュボード。<br />
-				ニュース・セキュリティ・トレンド・AI比較の4つの視点から、エンジニアに必要な情報をコンパクトにお届けします。
+				<a href="https://note.com/hi_liteworks/n/n6357a2b393e9" target="_blank" rel="noopener noreferrer" class="text-accent underline underline-offset-2 hover:opacity-80">
+					「Claude Codeをギャル化して最&高な開発環境が爆誕した話」
+				</a>
+				に感銘を受けて作りました。<br />
+				難解な技術記事も、ギャルがコメントすればとっつきやすくなるんじゃないか？というコンセプトです。
 			</p>
+			<div class="flex items-start gap-5 max-md:flex-col max-md:items-center mt-5">
+				<img
+					src="/character.jpg"
+					alt="ShiranKedoのキャラクター"
+					width="120"
+					height="120"
+					class="rounded-lg border border-border shrink-0"
+				/>
+				<p class="text-[14px] leading-[1.8] text-ink">
+					こんな子が喋ってるイメージです。
+				</p>
+			</div>
 		</section>
 
 		<section class="mb-8">
 			<h2 class="font-mono text-[10px] text-muted tracking-[.1em] uppercase mb-3">Data Sources</h2>
-			<div class="flex flex-wrap gap-2">
-				{[
-					"Hacker News",
-					"はてなブックマーク",
-					"Zenn",
-					"Lobsters",
-					"arXiv",
-					"NVD (CVE)",
-					"GitHub API",
-					"Artificial Analysis",
-					"LiteLLM",
-				].map((source) => (
-					<span class="font-mono text-[10px] tracking-[.04em] px-2.5 py-1 rounded-sm bg-surface border border-border text-ink">
-						{source}
-					</span>
-				))}
-			</div>
+			<ul class="font-mono text-[12px] text-muted list-disc list-inside space-y-1">
+				<li>news.ycombinator.com</li>
+				<li>b.hatena.ne.jp</li>
+				<li>zenn.dev</li>
+				<li>lobste.rs</li>
+				<li>arxiv.org</li>
+				<li>nvd.nist.gov</li>
+				<li>api.github.com</li>
+				<li>artificialanalysis.ai</li>
+			</ul>
 		</section>
 
 		<section class="mb-8">
