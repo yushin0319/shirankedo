@@ -35,10 +35,7 @@ export const onRequest = defineMiddleware(async (_ctx, next) => {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=()",
   );
-  response.headers.set(
-    "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'",
-  );
+  // CSP は astro.config.mjs の security.csp で管理（script-src にハッシュ自動付与）
 
   return response;
 });
