@@ -1,8 +1,25 @@
 // API 認証・レスポンスヘルパー
 
-/** X-API-Key ヘッダーの検証 */
+/**
+ * タイミングセーフな文字列比較（定数時間）
+ * 長さが異なる場合もダミー比較を行い、処理時間から長さ情報が漏れないようにする
+ */
+function timingSafeEqual(a: string, b: string): boolean {
+  const encoder = new TextEncoder();
+  const aBuf = encoder.encode(a);
+  const bBuf = encoder.encode(b);
+  const len = Math.max(aBuf.length, bBuf.length);
+  let diff = aBuf.length ^ bBuf.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (aBuf[i] ?? 0) ^ (bBuf[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+/** X-API-Key ヘッダーの検証（タイミングセーフ） */
 export function verifyApiKey(request: Request, apiKey: string): boolean {
-  return request.headers.get("X-API-Key") === apiKey;
+  const provided = request.headers.get("X-API-Key") ?? "";
+  return timingSafeEqual(provided, apiKey);
 }
 
 /** 成功レスポンス */
