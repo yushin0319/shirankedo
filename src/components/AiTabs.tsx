@@ -21,8 +21,6 @@ type SubscriptionPlan = InferSelectModel<typeof subscriptionPlans>;
 type AiTabsProps = {
   models: LlmModel[];
   plans: SubscriptionPlan[];
-  apiCommentText: string | null;
-  subCommentText: string | null;
   providerDotClass: Record<string, string>;
   jpyPerUsd?: number;
   jpyPerEur?: number;
@@ -44,8 +42,6 @@ type SubRow = {
   dotClass: string;
 };
 
-const STEP = 10;
-
 export function AiTabs(props: AiTabsProps) {
   return (
     <ErrorBoundary>
@@ -57,8 +53,6 @@ export function AiTabs(props: AiTabsProps) {
 function AiTabsInner({
   models,
   plans,
-  apiCommentText,
-  subCommentText,
   providerDotClass,
   jpyPerUsd = 150,
   jpyPerEur = 163,
@@ -72,7 +66,7 @@ function AiTabsInner({
     key: "provider",
     dir: "asc",
   });
-  const [apiVisibleCount, setApiVisibleCount] = useState(STEP);
+  const [apiVisibleCount, setApiVisibleCount] = useState(Infinity);
 
   // API行データを事前計算
   const apiRows: ApiRow[] = useMemo(
@@ -128,17 +122,22 @@ function AiTabsInner({
     [plans, providerDotClass, jpyPerUsd, jpyPerEur],
   );
 
-  // ソート済みサブスク行
+  // ソート済みサブスク行（priceは円換算値でソート）
   const sortedSubRows = useMemo(() => {
-    const sortable = subRows.map((r) => ({
-      ...r,
-      provider: r.plan.provider,
-      score: 0,
-      monthly: 0,
-      price: r.plan.price,
-    }));
+    const sortable = subRows.map((r) => {
+      const { price, currency } = r.plan;
+      const rate =
+        currency === "EUR" ? jpyPerEur : currency === "JPY" ? 1 : jpyPerUsd;
+      return {
+        ...r,
+        provider: r.plan.provider,
+        score: 0,
+        monthly: 0,
+        price: price * rate,
+      };
+    });
     return sortByKey(sortable, subSort.key, subSort.dir);
-  }, [subRows, subSort]);
+  }, [subRows, subSort, jpyPerUsd, jpyPerEur]);
 
   const subGaps = useMemo(
     () =>
@@ -157,7 +156,7 @@ function AiTabsInner({
   function handleApiSort(key: string) {
     const k = key as "provider" | "score" | "monthly";
     setApiSort((prev) => nextSortState(prev, k));
-    setApiVisibleCount(STEP);
+    setApiVisibleCount(Infinity);
   }
 
   // サブスクソート
@@ -400,21 +399,6 @@ function AiTabsInner({
               </div>
             ))}
           </div>
-
-          {apiVisibleCount < sortedApiRows.length && (
-            <button
-              type="button"
-              className="block w-full py-3 mt-2 bg-transparent border border-dashed border-border rounded-sm font-mono text-[11px] text-muted tracking-[.06em] cursor-pointer transition-all hover:border-ink hover:text-ink"
-              id="api-more"
-              onClick={() =>
-                setApiVisibleCount((prev) =>
-                  Math.min(prev + STEP, sortedApiRows.length),
-                )
-              }
-            >
-              + もっと見る
-            </button>
-          )}
         </div>
 
         {/* TAB 2: サブスク比較 */}
@@ -597,21 +581,6 @@ function AiTabsInner({
             ))}
           </div>
         </div>
-
-        {/* 付箋 */}
-        {(activeTab === "text" ? apiCommentText : subCommentText) && (
-          <div className="mt-7 flex justify-center">
-            <div className="relative w-full max-w-150 p-5 pb-6.5 bg-sticky-4 shadow-[3px_5px_12px_rgba(0,0,0,.18),0_1px_3px_rgba(0,0,0,.08)] rotate-[-0.5deg] max-md:rotate-0 max-md:max-w-full">
-              <div className="font-mono text-[10px] tracking-[.08em] text-sticky-ink opacity-50 mb-2">
-                SUMMARY
-              </div>
-              <div className="text-[12.5px] leading-[1.9] text-sticky-ink">
-                {activeTab === "text" ? apiCommentText : subCommentText}
-              </div>
-              <div className="sticky-fold max-md:hidden" />
-            </div>
-          </div>
-        )}
       </main>
     </>
   );

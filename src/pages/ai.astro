@@ -1,17 +1,15 @@
 ---
 import { env } from "cloudflare:workers";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import Layout from "../layouts/Layout.astro";
 import { getDb } from "../db/client";
-import { llmModels, subscriptionPlans, pageComments } from "../db/schema";
+import { llmModels, subscriptionPlans } from "../db/schema";
 import { AiTabs } from "../components/AiTabs";
 import { formatDisplayDate } from "../lib/date";
 import { JPY_PER_USD_FALLBACK, JPY_PER_EUR_FALLBACK } from "../lib/constants";
 
 let models: any[] = [];
 let plans: any[] = [];
-let apiCommentText: string | null = null;
-let subCommentText: string | null = null;
 let fetchError = false;
 
 try {
@@ -26,23 +24,6 @@ try {
 		.select()
 		.from(subscriptionPlans)
 		.orderBy(subscriptionPlans.provider, subscriptionPlans.price);
-
-	const aiApiComment = await db
-		.select()
-		.from(pageComments)
-		.where(sql`${pageComments.type} = 'ai_api'`)
-		.orderBy(desc(pageComments.createdAt))
-		.limit(1);
-
-	const aiSubComment = await db
-		.select()
-		.from(pageComments)
-		.where(sql`${pageComments.type} = 'ai_sub'`)
-		.orderBy(desc(pageComments.createdAt))
-		.limit(1);
-
-	apiCommentText = aiApiComment[0]?.content ?? null;
-	subCommentText = aiSubComment[0]?.content ?? null;
 } catch (e) {
 	console.error("Failed to fetch AI data:", e);
 	fetchError = true;
@@ -110,8 +91,6 @@ const providerDotClass: Record<string, string> = {
 			client:idle
 			models={models}
 			plans={plans}
-			apiCommentText={apiCommentText}
-			subCommentText={subCommentText}
 			providerDotClass={providerDotClass}
 			jpyPerUsd={jpyPerUsd}
 			jpyPerEur={jpyPerEur}
