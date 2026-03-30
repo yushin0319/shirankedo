@@ -122,17 +122,22 @@ function AiTabsInner({
     [plans, providerDotClass, jpyPerUsd, jpyPerEur],
   );
 
-  // ソート済みサブスク行
+  // ソート済みサブスク行（priceは円換算値でソート）
   const sortedSubRows = useMemo(() => {
-    const sortable = subRows.map((r) => ({
-      ...r,
-      provider: r.plan.provider,
-      score: 0,
-      monthly: 0,
-      price: r.plan.price,
-    }));
+    const sortable = subRows.map((r) => {
+      const { price, currency } = r.plan;
+      const rate =
+        currency === "EUR" ? jpyPerEur : currency === "JPY" ? 1 : jpyPerUsd;
+      return {
+        ...r,
+        provider: r.plan.provider,
+        score: 0,
+        monthly: 0,
+        price: price * rate,
+      };
+    });
     return sortByKey(sortable, subSort.key, subSort.dir);
-  }, [subRows, subSort]);
+  }, [subRows, subSort, jpyPerUsd, jpyPerEur]);
 
   const subGaps = useMemo(
     () =>
