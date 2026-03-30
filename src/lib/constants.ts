@@ -7,7 +7,10 @@ export const NEW_REPO_DAYS = 7;
 export const RELATIVE_DATE_DAYS = 7;
 
 /** トレンドページのstar推移データ取得期間（日数） */
-export const TREND_LOOKBACK_DAYS = 15;
+export const TREND_LOOKBACK_DAYS = 12;
+
+/** トレンドdiff算出の時間窓（時間）。最新スナップからこの範囲内の最古を前回分とする */
+export const TREND_DIFF_WINDOW_HOURS = 7 * 24 + 5; // 173時間
 
 /** スコア時間減衰率（1日あたり15%減衰） */
 export const DECAY_RATE = 0.85;

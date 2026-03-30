@@ -44,8 +44,6 @@ const providerDotClass: Record<string, string> = {
 const defaultProps = {
   models: makeModels(12),
   plans: makePlans(4),
-  apiCommentText: "APIテストコメント",
-  subCommentText: "サブスクテストコメント",
   providerDotClass,
 };
 
@@ -83,71 +81,13 @@ describe("AiTabs", () => {
     });
   });
 
-  describe("もっと見る（段階追加）", () => {
-    it("11件目以降が非表示", () => {
-      render(<AiTabs {...defaultProps} />);
+  describe("全件表示", () => {
+    it("全モデルが初期表示される", () => {
+      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
       const tbody = document.getElementById("api-tbody");
       const rows = tbody?.querySelectorAll("tr") ?? [];
-      const visibleRows = Array.from(rows).filter(
-        (r) => !r.classList.contains("api-hidden"),
-      );
-      expect(visibleRows.length).toBe(10);
-    });
-
-    it("「もっと見る」クリックで10件ずつ追加表示される", async () => {
-      const user = userEvent.setup();
-      // 25件で段階追加をテスト
-      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
-
-      const moreBtn = screen.getByText("+ もっと見る");
-      await user.click(moreBtn);
-
-      // 1回クリック: 20件表示
-      const tbody = document.getElementById("api-tbody");
-      const visibleAfter1 = Array.from(
-        tbody?.querySelectorAll("tr") ?? [],
-      ).filter((r) => !r.classList.contains("api-hidden"));
-      expect(visibleAfter1.length).toBe(20);
-
-      // ボタンはまだ表示されている
-      expect(screen.getByText("+ もっと見る")).toBeInTheDocument();
-    });
-
-    it("全件表示でボタンが消える", async () => {
-      const user = userEvent.setup();
-      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
-
-      // 2回クリックで全件表示
-      await user.click(screen.getByText("+ もっと見る"));
-      await user.click(screen.getByText("+ もっと見る"));
-
-      const tbody = document.getElementById("api-tbody");
-      const hiddenRows = tbody?.querySelectorAll("tr.api-hidden") ?? [];
-      expect(hiddenRows.length).toBe(0);
-
-      // ボタンが消えている
+      expect(rows.length).toBe(25);
       expect(screen.queryByText("+ もっと見る")).not.toBeInTheDocument();
-    });
-
-    it("ソート変更で表示件数がリセットされる", async () => {
-      const user = userEvent.setup();
-      render(<AiTabs {...defaultProps} models={makeModels(25)} />);
-
-      // もっと見るで20件表示
-      await user.click(screen.getByText("+ もっと見る"));
-
-      // ソート変更
-      const providerHeader = document.querySelector(
-        '#tab-text th[data-sort="provider"]',
-      );
-      await user.click(providerHeader!);
-
-      // 10件に戻る
-      const tbody = document.getElementById("api-tbody");
-      const visibleRows = Array.from(
-        tbody?.querySelectorAll("tr") ?? [],
-      ).filter((r) => !r.classList.contains("api-hidden"));
-      expect(visibleRows.length).toBe(10);
     });
   });
 
@@ -283,25 +223,6 @@ describe("AiTabs", () => {
 
       const tbody = document.getElementById("sub-tbody");
       expect(tbody?.textContent).toContain("¥2,900");
-    });
-  });
-
-  describe("付箋", () => {
-    it("API利用タブで apiCommentText が表示される", () => {
-      render(<AiTabs {...defaultProps} />);
-      expect(screen.getByText("APIテストコメント")).toBeInTheDocument();
-    });
-
-    it("サブスク比較タブで subCommentText が表示される", async () => {
-      const user = userEvent.setup();
-      render(<AiTabs {...defaultProps} />);
-      await user.click(screen.getByRole("button", { name: "サブスク比較" }));
-      expect(screen.getByText("サブスクテストコメント")).toBeInTheDocument();
-    });
-
-    it("apiCommentText null のとき API利用タブで付箋非表示", () => {
-      render(<AiTabs {...defaultProps} apiCommentText={null} />);
-      expect(screen.queryByText("SUMMARY")).not.toBeInTheDocument();
     });
   });
 });
