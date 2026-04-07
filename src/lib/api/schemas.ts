@@ -88,6 +88,12 @@ export const weeklySummarySchema = z.object({
   content: z.string().min(1),
 });
 
+/** リポジトリ rename */
+export const repoRenameSchema = z.object({
+  from: z.string().min(1),
+  to: z.string().min(1),
+});
+
 /** ページコメント（付箋） */
 export const pageCommentSchema = z.object({
   type: z.enum(["trend", "ai_api", "ai_sub"]),
