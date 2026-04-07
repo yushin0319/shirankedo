@@ -4,6 +4,7 @@ import { createTestDbWithTables } from "../../db/test-helper";
 import {
   getTrackingRepos,
   processReleases,
+  processRepoRenames,
   processTrackingRepos,
   processVulnerabilities,
 } from "./ingest-upsert";
@@ -116,6 +117,58 @@ describe("processTrackingRepos", () => {
     const rows = await db.select().from(trackingRepos);
     expect(rows[0].description).toBe("更新された説明");
     expect(rows[0].publishedAt).toBe("2016-01-01");
+  });
+});
+
+describe("processRepoRenames", () => {
+  const oldRepo = {
+    repo: "old-owner/repo",
+    displayName: "Repo",
+    description: "テスト",
+    language: "TypeScript",
+  };
+  const newRepo = {
+    repo: "new-owner/repo",
+    displayName: "Repo",
+    description: "テスト",
+    language: "TypeScript",
+  };
+
+  it("from が存在 & to が存在 → from を DELETE", async () => {
+    await processTrackingRepos(db, [oldRepo, newRepo]);
+    const result = await processRepoRenames(db, [
+      { from: "old-owner/repo", to: "new-owner/repo" },
+    ]);
+    expect(result.deleted).toBe(1);
+    const rows = await db.select().from(trackingRepos);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].repo).toBe("new-owner/repo");
+  });
+
+  it("from が存在 & to が存在しない → skip（DELETE しない）", async () => {
+    await processTrackingRepos(db, [oldRepo]);
+    const result = await processRepoRenames(db, [
+      { from: "old-owner/repo", to: "new-owner/repo" },
+    ]);
+    expect(result.deleted).toBe(0);
+    const rows = await db.select().from(trackingRepos);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].repo).toBe("old-owner/repo");
+  });
+
+  it("from が存在しない → skip", async () => {
+    await processTrackingRepos(db, [newRepo]);
+    const result = await processRepoRenames(db, [
+      { from: "old-owner/repo", to: "new-owner/repo" },
+    ]);
+    expect(result.deleted).toBe(0);
+    const rows = await db.select().from(trackingRepos);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("空配列で deleted: 0 を返す", async () => {
+    const result = await processRepoRenames(db, []);
+    expect(result).toEqual({ deleted: 0 });
   });
 });
 

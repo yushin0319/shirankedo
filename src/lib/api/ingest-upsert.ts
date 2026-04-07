@@ -5,6 +5,7 @@ import type { AppDatabase } from "../../db/client";
 import { releases, trackingRepos, vulnerabilities } from "../../db/schema";
 import {
   releaseSchema,
+  repoRenameSchema,
   trackingRepoSchema,
   vulnerabilitySchema,
 } from "./schemas";
@@ -111,6 +112,39 @@ export async function processTrackingRepos(
     }
   }
   return { inserted, updated };
+}
+
+/** repo-renames: 旧名の tracking_repos レコードを削除 */
+export async function processRepoRenames(
+  db: AppDatabase,
+  renames: { from: string; to: string }[],
+): Promise<{ deleted: number }> {
+  if (renames.length === 0) return { deleted: 0 };
+  const parsed = z.array(repoRenameSchema).parse(renames);
+
+  let deleted = 0;
+
+  for (const { from, to } of parsed) {
+    // to が tracking_repos に存在するか確認（存在しなければ skip）
+    const toExists = await db
+      .select({ repo: trackingRepos.repo })
+      .from(trackingRepos)
+      .where(eq(trackingRepos.repo, to));
+    if (toExists.length === 0) continue;
+
+    // from が tracking_repos に存在するか確認
+    const fromExists = await db
+      .select({ repo: trackingRepos.repo })
+      .from(trackingRepos)
+      .where(eq(trackingRepos.repo, from));
+    if (fromExists.length === 0) continue;
+
+    // from を tracking_repos から DELETE
+    await db.delete(trackingRepos).where(eq(trackingRepos.repo, from));
+    deleted++;
+  }
+
+  return { deleted };
 }
 
 /** tracking-repos: GET 一覧 */
