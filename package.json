@@ -35,7 +35,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.9.0",
     "drizzle-kit": "^0.31.10",
     "husky": "^9.1.7",
     "jsdom": "^29.0.2",
