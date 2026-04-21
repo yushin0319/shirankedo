@@ -5,11 +5,10 @@ import { env } from "cloudflare:workers";
 export const onRequest = defineMiddleware(async (_ctx, next) => {
   const url = new URL(_ctx.request.url);
 
-  // --- レート制限（POST /api/ingest/** のみ） ---
-  if (
-    _ctx.request.method === "POST" &&
-    url.pathname.startsWith("/api/ingest/")
-  ) {
+  // --- レート制限（/api/ingest/** 全メソッド） ---
+  // GET も含めるのは、認証済み呼び出し元（n8n）の暴走ループで D1 クォータを
+  // 食い潰されるのを防ぐため。per-path/per-minute の粗い制限で十分。
+  if (url.pathname.startsWith("/api/ingest/")) {
     const key = `rl:${url.pathname}:${currentMinute()}`;
     const count = Number((await env.KV.get(key)) ?? "0");
     if (count >= 60) {
