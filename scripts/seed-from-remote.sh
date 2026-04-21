@@ -18,7 +18,7 @@ for tbl in $TABLES; do
   QUERY+="SELECT '${tbl}' as _table, * FROM ${tbl};"
 done
 
-npx wrangler d1 execute "$DB_NAME" --remote --command "$QUERY" > "$DUMP_FILE" 2>/dev/null
+bunx wrangler d1 execute "$DB_NAME" --remote --command "$QUERY" > "$DUMP_FILE" 2>/dev/null
 
 # JSONをパースしてINSERT SQLを生成
 python -c "
@@ -61,7 +61,7 @@ print(f'  {total} 行を取得')
 "
 
 echo "💾 ローカルD1に書き込み中..."
-npx wrangler d1 execute "$DB_NAME" --local --file="$SQL_FILE" > /dev/null 2>&1
+bunx wrangler d1 execute "$DB_NAME" --local --file="$SQL_FILE" > /dev/null 2>&1
 
 # 一時ファイル削除
 rm -f "$DUMP_FILE" "$SQL_FILE"
