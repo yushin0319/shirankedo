@@ -1,5 +1,5 @@
 -- ローカル開発用シードデータ
--- 使い方: npx wrangler d1 execute shirankedo --local --file=scripts/seed.sql
+-- 使い方: bunx wrangler d1 execute shirankedo --local --file=scripts/seed.sql
 
 -- 記事（ニュース）
 INSERT INTO articles (url, title, source, summary, comment, tags, impact, is_paper, published_at) VALUES
