@@ -10,36 +10,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
       - name: Biome check
-        run: npx @biomejs/biome check .
+        run: bunx @biomejs/biome check .
       - name: Vitest
-        run: npx vitest run
+        run: bunx vitest run
       - name: Astro check
-        run: npx astro check
+        run: bunx astro check
       - name: Build
-        run: npx astro build
+        run: bunx astro build
 
   e2e:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
+          bun-version: 1.3.13
+      - run: bun install --frozen-lockfile
       - name: Install Playwright Chromium
-        run: npx playwright install chromium --with-deps
+        run: bunx playwright install chromium --with-deps
       - name: Seed local D1
         run: |
           for f in drizzle/0*.sql; do
-            npx wrangler d1 execute shirankedo --local --file="$f"
+            bunx wrangler d1 execute shirankedo --local --file="$f"
           done
-          npx wrangler d1 execute shirankedo --local --file=e2e/seed.sql
+          bunx wrangler d1 execute shirankedo --local --file=e2e/seed.sql
       - name: E2E tests
-        run: npx playwright test
+        run: bunx playwright test
