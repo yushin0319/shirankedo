@@ -84,6 +84,20 @@ describe("processReleases", () => {
     const rows = await db.select().from(releases);
     expect(rows).toHaveLength(2);
   });
+
+  it("チャンクサイズ超過（50件）でも全件 INSERT できる", async () => {
+    const batch = Array.from({ length: 50 }, (_, i) => ({
+      repo: `owner/repo-${i}`,
+      tag: `v1.0.${i}`,
+      version: `1.0.${i}`,
+      type: "minor" as const,
+      publishedAt: "2026-04-24",
+    }));
+    const result = await processReleases(db, batch);
+    expect(result.inserted).toBe(50);
+    const rows = await db.select().from(releases);
+    expect(rows).toHaveLength(50);
+  });
 });
 
 describe("processTrackingRepos", () => {
