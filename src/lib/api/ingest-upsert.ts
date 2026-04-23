@@ -10,6 +10,12 @@ import {
   vulnerabilitySchema,
 } from "./schemas";
 
+// D1 は 1 prepared statement あたり最大 100 bound parameter。
+// 各テーブルの INSERT 列数（5 列前後）に対し余裕を持たせて 20 行ずつに分割する。
+// また CF Workers Free の subrequest 上限（50）に対し、50 行以上のループ INSERT で
+// 枯渇するため、bulk INSERT + chunk で subrequest 数を大幅に削減する。
+const INSERT_CHUNK_SIZE = 20;
+
 /** vulnerabilities: UPSERT（cvssScore 更新あり） */
 export async function processVulnerabilities(
   db: AppDatabase,
@@ -25,27 +31,26 @@ export async function processVulnerabilities(
     .where(inArray(vulnerabilities.cveId, cveIds));
   const existingSet = new Set(existing.map((r) => r.cveId));
 
-  let inserted = 0;
-  let updated = 0;
+  const newItems = parsed.filter((v) => !existingSet.has(v.cveId));
+  const updateItems = parsed.filter((v) => existingSet.has(v.cveId));
 
-  for (const item of parsed) {
-    if (existingSet.has(item.cveId)) {
-      await db
-        .update(vulnerabilities)
-        .set({
-          title: item.title,
-          cvssScore: item.cvssScore,
-          publishedAt: item.publishedAt,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(vulnerabilities.cveId, item.cveId));
-      updated++;
-    } else {
-      await db.insert(vulnerabilities).values(item);
-      inserted++;
-    }
+  for (let i = 0; i < newItems.length; i += INSERT_CHUNK_SIZE) {
+    await db
+      .insert(vulnerabilities)
+      .values(newItems.slice(i, i + INSERT_CHUNK_SIZE));
   }
-  return { inserted, updated };
+  for (const item of updateItems) {
+    await db
+      .update(vulnerabilities)
+      .set({
+        title: item.title,
+        cvssScore: item.cvssScore,
+        publishedAt: item.publishedAt,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(vulnerabilities.cveId, item.cveId));
+  }
+  return { inserted: newItems.length, updated: updateItems.length };
 }
 
 /** releases: INSERT（repo+tag 重複スキップ） */
@@ -69,8 +74,8 @@ export async function processReleases(
   );
   if (newItems.length === 0) return { inserted: 0 };
 
-  for (const item of newItems) {
-    await db.insert(releases).values(item);
+  for (let i = 0; i < newItems.length; i += INSERT_CHUNK_SIZE) {
+    await db.insert(releases).values(newItems.slice(i, i + INSERT_CHUNK_SIZE));
   }
   return { inserted: newItems.length };
 }
@@ -90,28 +95,27 @@ export async function processTrackingRepos(
     .where(inArray(trackingRepos.repo, repoNames));
   const existingSet = new Set(existing.map((r) => r.repo));
 
-  let inserted = 0;
-  let updated = 0;
+  const newItems = parsed.filter((r) => !existingSet.has(r.repo));
+  const updateItems = parsed.filter((r) => existingSet.has(r.repo));
 
-  for (const item of parsed) {
-    if (existingSet.has(item.repo)) {
-      await db
-        .update(trackingRepos)
-        .set({
-          displayName: item.displayName,
-          description: item.description,
-          language: item.language,
-          publishedAt: item.publishedAt,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(trackingRepos.repo, item.repo));
-      updated++;
-    } else {
-      await db.insert(trackingRepos).values(item);
-      inserted++;
-    }
+  for (let i = 0; i < newItems.length; i += INSERT_CHUNK_SIZE) {
+    await db
+      .insert(trackingRepos)
+      .values(newItems.slice(i, i + INSERT_CHUNK_SIZE));
   }
-  return { inserted, updated };
+  for (const item of updateItems) {
+    await db
+      .update(trackingRepos)
+      .set({
+        displayName: item.displayName,
+        description: item.description,
+        language: item.language,
+        publishedAt: item.publishedAt,
+        updatedAt: new Date().toISOString(),
+      })
+      .where(eq(trackingRepos.repo, item.repo));
+  }
+  return { inserted: newItems.length, updated: updateItems.length };
 }
 
 /** repo-renames: 旧名の tracking_repos レコードを削除 */
