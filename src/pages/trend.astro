@@ -8,6 +8,7 @@ import { isNewRepo, rankTrendRepos } from "../lib/trend";
 import { formatDisplayDate } from "../lib/date";
 import { repoToGitHubUrl } from "../lib/github";
 import { TREND_LOOKBACK_DAYS, FETCH_LIMIT } from "../lib/constants";
+import { queryD1 } from "../lib/d1-wrapper";
 
 let ranked: any[] = [];
 let trendComment: string | null = null;
@@ -17,17 +18,21 @@ const now = new Date();
 try {
 	const db = getDb(env.DB);
 
-	const repos = await db.select().from(trackingRepos);
+	const repos = await queryD1("tracking_repos.all", () =>
+		db.select().from(trackingRepos),
+	);
 
 	const lookback = new Date();
 	lookback.setDate(lookback.getDate() - TREND_LOOKBACK_DAYS);
 	const cutoff = lookback.toISOString().slice(0, 10);
 
-	const latestStats = await db
-		.select()
-		.from(repoStats)
-		.where(sql`${repoStats.createdAt} >= ${cutoff}`)
-		.orderBy(desc(repoStats.createdAt));
+	const latestStats = await queryD1("repo_stats.recent", () =>
+		db
+			.select()
+			.from(repoStats)
+			.where(sql`${repoStats.createdAt} >= ${cutoff}`)
+			.orderBy(desc(repoStats.createdAt)),
+	);
 
 	ranked = rankTrendRepos(repos, latestStats, FETCH_LIMIT).map((r) => ({
 		...r,

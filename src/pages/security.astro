@@ -7,6 +7,7 @@ import { vulnerabilities, releases, securityDaily, trackingRepos, repoStats } fr
 import { SecurityTabs } from "../components/SecurityTabs";
 import { formatDisplayDate } from "../lib/date";
 import { vulnDecayScore, releaseDecayScore } from "../lib/score";
+import { queryD1 } from "../lib/d1-wrapper";
 import { sql } from "drizzle-orm";
 
 let vulns: any[] = [];
@@ -18,19 +19,27 @@ let fetchError = false;
 try {
 	const db = getDb(env.DB);
 
-	const daily = await db
-		.select()
-		.from(securityDaily)
-		.orderBy(desc(securityDaily.createdAt))
-		.limit(1);
+	const daily = await queryD1("security_daily.latest", () =>
+		db
+			.select()
+			.from(securityDaily)
+			.orderBy(desc(securityDaily.createdAt))
+			.limit(1),
+	);
 
-	const vulnsRaw = await db.select().from(vulnerabilities);
-	const relsRaw = await db.select().from(releases);
+	const vulnsRaw = await queryD1("vulnerabilities.all", () =>
+		db.select().from(vulnerabilities),
+	);
+	const relsRaw = await queryD1("releases.all", () =>
+		db.select().from(releases),
+	);
 
-	const latestStats = await db
-		.select({ repo: repoStats.repo, stars: repoStats.stars })
-		.from(repoStats)
-		.where(sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`);
+	const latestStats = await queryD1("repo_stats.latest", () =>
+		db
+			.select({ repo: repoStats.repo, stars: repoStats.stars })
+			.from(repoStats)
+			.where(sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`),
+	);
 	const starsMap: Record<string, number> = Object.fromEntries(
 		latestStats.map((s) => [s.repo, s.stars]),
 	);
@@ -45,7 +54,9 @@ try {
 
 	dailyComment = daily[0]?.comment ?? null;
 
-	const repos = await db.select().from(trackingRepos);
+	const repos = await queryD1("tracking_repos.all", () =>
+		db.select().from(trackingRepos),
+	);
 	repoMap = Object.fromEntries(
 		repos.map((r) => [r.repo, { displayName: r.displayName, description: r.description ?? null }])
 	);
