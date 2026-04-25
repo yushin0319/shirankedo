@@ -39,12 +39,14 @@ try {
 		isNew: isNewRepo(r.publishedAt, now),
 	}));
 
-	const comment = await db
-		.select()
-		.from(pageComments)
-		.where(sql`${pageComments.type} = 'trend'`)
-		.orderBy(desc(pageComments.createdAt))
-		.limit(1);
+	const comment = await queryD1("page_comments.trend_latest", () =>
+		db
+			.select()
+			.from(pageComments)
+			.where(sql`${pageComments.type} = 'trend'`)
+			.orderBy(desc(pageComments.createdAt))
+			.limit(1),
+	);
 
 	trendComment = comment[0]?.content ?? null;
 } catch (e) {
