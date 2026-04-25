@@ -7,13 +7,16 @@ import { articles } from "../db/schema";
 import { formatDisplayDate } from "../lib/date";
 import { topArticles } from "../lib/articles";
 import { FETCH_LIMIT } from "../lib/constants";
+import { queryD1 } from "../lib/d1-wrapper";
 
 let rows: any[] = [];
 let fetchError = false;
 
 try {
 	const db = getDb(env.DB);
-	const allRows = await db.select().from(articles);
+	const allRows = await queryD1("articles.all", () =>
+		db.select().from(articles),
+	);
 	const now = new Date();
 	rows = topArticles(allRows, FETCH_LIMIT, now);
 } catch (e) {

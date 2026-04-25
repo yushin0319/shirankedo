@@ -2,10 +2,13 @@
 import { desc, gte } from "drizzle-orm";
 import type { AppDatabase } from "../../db/client";
 import { articles } from "../../db/schema";
+import { queryD1 } from "../d1-wrapper";
 
 /** 既存URL一覧を取得 */
 export async function getArticleUrls(db: AppDatabase): Promise<string[]> {
-  const rows = await db.select({ url: articles.url }).from(articles);
+  const rows = await queryD1("articles.urls", () =>
+    db.select({ url: articles.url }).from(articles),
+  );
   return rows.map((r) => r.url);
 }
 
@@ -18,9 +21,11 @@ export async function getRecentArticles(
   since.setDate(since.getDate() - days);
   const sinceStr = since.toISOString().split("T")[0];
 
-  return db
-    .select()
-    .from(articles)
-    .where(gte(articles.publishedAt, sinceStr))
-    .orderBy(desc(articles.publishedAt));
+  return queryD1("articles.recent", () =>
+    db
+      .select()
+      .from(articles)
+      .where(gte(articles.publishedAt, sinceStr))
+      .orderBy(desc(articles.publishedAt)),
+  );
 }

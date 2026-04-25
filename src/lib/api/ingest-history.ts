@@ -9,6 +9,7 @@ import {
   subscriptionPlanHistory,
   subscriptionPlans,
 } from "../../db/schema";
+import { queryD1 } from "../d1-wrapper";
 import { llmModelSchema, subscriptionPlanSchema } from "./schemas";
 
 // db.batch() に渡せるクエリの型
@@ -23,10 +24,9 @@ export async function processLlmModels(
   const parsed = z.array(llmModelSchema).parse(data);
 
   const names = parsed.map((m) => m.modelName);
-  const existing = await db
-    .select()
-    .from(llmModels)
-    .where(inArray(llmModels.modelName, names));
+  const existing = await queryD1("llm_models.existing", () =>
+    db.select().from(llmModels).where(inArray(llmModels.modelName, names)),
+  );
   const existingMap = new Map(existing.map((m) => [m.modelName, m]));
 
   let inserted = 0;
@@ -80,7 +80,9 @@ export async function processLlmModels(
   }
 
   if (writes.length > 0) {
-    await db.batch(writes as [BatchQuery, ...BatchQuery[]]);
+    await queryD1("llm_models.batch", () =>
+      db.batch(writes as [BatchQuery, ...BatchQuery[]]),
+    );
   }
   return { inserted, updated, historyCreated };
 }
@@ -94,10 +96,12 @@ export async function processSubscriptionPlans(
   const parsed = z.array(subscriptionPlanSchema).parse(data);
 
   const services = [...new Set(parsed.map((p) => p.service))];
-  const existing = await db
-    .select()
-    .from(subscriptionPlans)
-    .where(inArray(subscriptionPlans.service, services));
+  const existing = await queryD1("subscription_plans.existing", () =>
+    db
+      .select()
+      .from(subscriptionPlans)
+      .where(inArray(subscriptionPlans.service, services)),
+  );
   const existingMap = new Map(
     existing.map((p) => [`${p.service}:${p.planName}`, p]),
   );
@@ -153,7 +157,9 @@ export async function processSubscriptionPlans(
   }
 
   if (writes.length > 0) {
-    await db.batch(writes as [BatchQuery, ...BatchQuery[]]);
+    await queryD1("subscription_plans.batch", () =>
+      db.batch(writes as [BatchQuery, ...BatchQuery[]]),
+    );
   }
   return { inserted, updated, historyCreated };
 }

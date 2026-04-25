@@ -8,6 +8,7 @@ import {
   securityDaily,
   weeklySummaries,
 } from "../../db/schema";
+import { queryD1 } from "../d1-wrapper";
 import {
   pageCommentSchema,
   repoStatSchema,
@@ -23,7 +24,7 @@ export async function processRepoStats(
   if (data.length === 0) return { inserted: 0 };
   const parsed = z.array(repoStatSchema).parse(data);
   for (const item of parsed) {
-    await db.insert(repoStats).values(item);
+    await queryD1("repo_stats.insert", () => db.insert(repoStats).values(item));
   }
   return { inserted: parsed.length };
 }
@@ -34,7 +35,9 @@ export async function processWeeklySummary(
   data: unknown,
 ): Promise<{ inserted: number }> {
   const parsed = weeklySummarySchema.parse(data);
-  await db.insert(weeklySummaries).values(parsed);
+  await queryD1("weekly_summaries.insert", () =>
+    db.insert(weeklySummaries).values(parsed),
+  );
   return { inserted: 1 };
 }
 
@@ -46,7 +49,9 @@ export async function processPageComments(
   if (data.length === 0) return { inserted: 0 };
   const parsed = z.array(pageCommentSchema).parse(data);
   for (const item of parsed) {
-    await db.insert(pageComments).values(item);
+    await queryD1("page_comments.insert", () =>
+      db.insert(pageComments).values(item),
+    );
   }
   return { inserted: parsed.length };
 }
@@ -57,6 +62,8 @@ export async function processSecurityDaily(
   data: unknown,
 ): Promise<{ inserted: number }> {
   const parsed = securityDailySchema.parse(data);
-  await db.insert(securityDaily).values(parsed);
+  await queryD1("security_daily.insert", () =>
+    db.insert(securityDaily).values(parsed),
+  );
   return { inserted: 1 };
 }

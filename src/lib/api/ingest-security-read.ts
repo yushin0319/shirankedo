@@ -4,6 +4,7 @@
 import { sql } from "drizzle-orm";
 import type { AppDatabase } from "../../db/client";
 import { releases, repoStats, vulnerabilities } from "../../db/schema";
+import { queryD1 } from "../d1-wrapper";
 import { releaseDecayScore, vulnDecayScore } from "../score";
 import { getRecentWeeklySummaries } from "./ingest-weekly-read";
 
@@ -23,7 +24,9 @@ export async function getSecurityTop(
   now: Date = new Date(),
 ): Promise<SecurityTopData> {
   // 脆弱性: 全件取得 → decay score順ソート → Top 5
-  const vulnsRaw = await db.select().from(vulnerabilities);
+  const vulnsRaw = await queryD1("vulnerabilities.all", () =>
+    db.select().from(vulnerabilities),
+  );
   const topVulns = vulnsRaw
     .sort(
       (a, b) =>
@@ -33,18 +36,22 @@ export async function getSecurityTop(
     .slice(0, 5);
 
   // repoStats: 各リポの最新スター数を取得
-  const latestStats = await db
-    .select({ repo: repoStats.repo, stars: repoStats.stars })
-    .from(repoStats)
-    .where(
-      sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`,
-    );
+  const latestStats = await queryD1("repo_stats.latest", () =>
+    db
+      .select({ repo: repoStats.repo, stars: repoStats.stars })
+      .from(repoStats)
+      .where(
+        sql`${repoStats.id} IN (SELECT MAX(id) FROM repo_stats GROUP BY repo)`,
+      ),
+  );
   const starsMap: Record<string, number> = Object.fromEntries(
     latestStats.map((s) => [s.repo, s.stars]),
   );
 
   // リリース: 全件取得 → decay score順ソート → Top 5
-  const relsRaw = await db.select().from(releases);
+  const relsRaw = await queryD1("releases.all", () =>
+    db.select().from(releases),
+  );
   const topReleases = relsRaw
     .sort(
       (a, b) =>
