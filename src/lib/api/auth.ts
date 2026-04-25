@@ -49,11 +49,13 @@ export async function safeJsonParse(
   }
 }
 
-/** catchブロック用: ZodError → 400、それ以外 → 500（内部情報を隠蔽） */
-export function handleApiError(e: unknown): Response {
+/** catchブロック用: ZodError → 400、それ以外 → Sentry 送信 + 500（内部情報を隠蔽） */
+export function handleApiError(e: unknown, request?: Request): Response {
   if (e instanceof Error && e.name === "ZodError") {
     return jsonError(400, "Validation failed");
   }
+  // L15: 想定外エラーは Sentry に送る (DSN 未設定なら no-op)
+  createSentry(env, request)?.captureException(e);
   return jsonError(500, "Internal error");
 }
 
@@ -61,6 +63,7 @@ export function handleApiError(e: unknown): Response {
 
 import { env } from "cloudflare:workers";
 import { type AppDatabase, getDb } from "../../db/client";
+import { createSentry } from "../sentry";
 
 type DbHandler = (db: AppDatabase, request: Request) => Promise<Response>;
 
@@ -82,7 +85,7 @@ export function apiGet(
       const db = getDb(env.DB);
       return await handler(db, request);
     } catch (e) {
-      return handleApiError(e);
+      return handleApiError(e, request);
     }
   };
 }
@@ -103,7 +106,7 @@ export function apiPost(
       const db = getDb(env.DB);
       return await handler(db, parsed.data);
     } catch (e) {
-      return handleApiError(e);
+      return handleApiError(e, request);
     }
   };
 }
@@ -121,7 +124,7 @@ export function apiNoDb(
     try {
       return await handler(request);
     } catch (e) {
-      return handleApiError(e);
+      return handleApiError(e, request);
     }
   };
 }
