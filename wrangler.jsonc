@@ -2,6 +2,10 @@
   "name": "shirankedo",
   "compatibility_date": "2026-03-14",
   "compatibility_flags": ["nodejs_compat"],
+  // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
+  "observability": {
+    "enabled": true
+  },
   "d1_databases": [
     {
       "binding": "DB",
