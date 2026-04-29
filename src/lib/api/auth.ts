@@ -50,18 +50,25 @@ export async function safeJsonParse(
 }
 
 /** catchブロック用: ZodError → 400、それ以外 → Sentry 送信 + 500（内部情報を隠蔽） */
-export function handleApiError(e: unknown, request?: Request): Response {
+export function handleApiError(
+  e: unknown,
+  request?: Request,
+  context?: ExecutionContext,
+): Response {
   if (e instanceof Error && e.name === "ZodError") {
     return jsonError(400, "Validation failed");
   }
   // L15: 想定外エラーは Sentry に送る (DSN 未設定なら no-op)
-  createSentry(env, request)?.captureException(e);
+  // context を渡すことで Toucan が waitUntil でレスポンス後の送信を保持する
+  // (L15-followup #508: 渡さないと CF Workers でレスポンス完了時に送信中断)
+  createSentry(env, { request, context })?.captureException(e);
   return jsonError(500, "Internal error");
 }
 
 // --- ラッパー関数 ---
 
 import { env } from "cloudflare:workers";
+import type { APIContext } from "astro";
 import { type AppDatabase, getDb } from "../../db/client";
 import { createSentry } from "../sentry";
 
@@ -71,13 +78,21 @@ type PostHandler = (db: AppDatabase, data: unknown) => Promise<Response>;
 
 type NoDbHandler = (request: Request) => Promise<Response>;
 
+/** Astro Cloudflare adapter の locals.runtime.ctx から ExecutionContext を取得 */
+function getExecutionContext(ctx: APIContext): ExecutionContext | undefined {
+  const runtime = (ctx.locals as { runtime?: { ctx?: ExecutionContext } })
+    .runtime;
+  return runtime?.ctx;
+}
+
 /**
  * GET用ラッパー: 認証 → DB初期化 → ハンドラ → エラーハンドリング
  */
 export function apiGet(
   handler: DbHandler,
-): (ctx: { request: Request }) => Promise<Response> {
-  return async ({ request }) => {
+): (ctx: APIContext) => Promise<Response> {
+  return async (ctx) => {
+    const { request } = ctx;
     if (!verifyApiKey(request, env.INGEST_API_KEY)) {
       return jsonError(401, "Unauthorized");
     }
@@ -85,7 +100,7 @@ export function apiGet(
       const db = getDb(env.DB);
       return await handler(db, request);
     } catch (e) {
-      return handleApiError(e, request);
+      return handleApiError(e, request, getExecutionContext(ctx));
     }
   };
 }
@@ -95,8 +110,9 @@ export function apiGet(
  */
 export function apiPost(
   handler: PostHandler,
-): (ctx: { request: Request }) => Promise<Response> {
-  return async ({ request }) => {
+): (ctx: APIContext) => Promise<Response> {
+  return async (ctx) => {
+    const { request } = ctx;
     if (!verifyApiKey(request, env.INGEST_API_KEY)) {
       return jsonError(401, "Unauthorized");
     }
@@ -106,7 +122,7 @@ export function apiPost(
       const db = getDb(env.DB);
       return await handler(db, parsed.data);
     } catch (e) {
-      return handleApiError(e, request);
+      return handleApiError(e, request, getExecutionContext(ctx));
     }
   };
 }
@@ -116,15 +132,16 @@ export function apiPost(
  */
 export function apiNoDb(
   handler: NoDbHandler,
-): (ctx: { request: Request }) => Promise<Response> {
-  return async ({ request }) => {
+): (ctx: APIContext) => Promise<Response> {
+  return async (ctx) => {
+    const { request } = ctx;
     if (!verifyApiKey(request, env.INGEST_API_KEY)) {
       return jsonError(401, "Unauthorized");
     }
     try {
       return await handler(request);
     } catch (e) {
-      return handleApiError(e, request);
+      return handleApiError(e, request, getExecutionContext(ctx));
     }
   };
 }
