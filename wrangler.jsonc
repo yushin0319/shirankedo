@@ -2,6 +2,13 @@
   "name": "shirankedo",
   "compatibility_date": "2026-03-14",
   "compatibility_flags": ["nodejs_compat"],
+  // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
+  "main": "src/worker.ts",
+  // Cron Trigger: UTC 18:00 daily = JST 03:00 daily（n8n cron-shirankedo-daily-stars と同時刻）
+  // DAILY_STARS_ENABLED!=="true" の間は dry-run で D1 INSERT・通知をスキップ
+  "triggers": {
+    "crons": ["0 18 * * *"]
+  },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
     "enabled": true
