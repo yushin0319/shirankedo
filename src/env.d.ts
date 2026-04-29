@@ -10,5 +10,7 @@ declare module "cloudflare:workers" {
     DB: D1Database;
     KV: KVNamespace;
     INGEST_API_KEY: string;
+    SENTRY_DSN?: string;
+    SENTRY_RELEASE?: string;
   };
 }
