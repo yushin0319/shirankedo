@@ -19,9 +19,9 @@ export const POST: APIRoute = apiNoDb(async (request) => {
   if (!parsed.ok) return parsed.response;
 
   const data = exchangeRateSchema.parse(parsed.data);
-  await env.KV.put("exchange-rate:latest", JSON.stringify(data), {
-    expirationTtl: 604800,
-  });
+  // TTL を設けず次回上書きまで永続化する。週次更新が失敗してもフロントが
+  // ハードコードのフォールバック値（150 円）に落ちないよう、古いキャッシュを保持する。
+  await env.KV.put("exchange-rate:latest", JSON.stringify(data));
   return jsonOk({ saved: true });
 });
 
