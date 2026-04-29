@@ -9,8 +9,11 @@ const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /** D1 INSERT のチャンクサイズ。776 行を 50 行ずつにまとめて subrequest 数を抑える。 */
 const INSERT_CHUNK = 50;
-/** wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。 */
-export const DAILY_STARS_CRON = "0 18 * * *";
+/**
+ * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
+ * 動作確認用に UTC 06:00 = JST 15:00 で運用中（本番切替時に UTC 18:00 = JST 03:00 へ戻す）。
+ */
+export const DAILY_STARS_CRON = "0 6 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
