@@ -78,13 +78,13 @@ type PostHandler = (db: AppDatabase, data: unknown) => Promise<Response>;
 
 type NoDbHandler = (request: Request) => Promise<Response>;
 
-/** Astro Cloudflare adapter の locals.runtime.cfContext から ExecutionContext を取得
- * (@astrojs/cloudflare v13 の Runtime interface: { cfContext: ExecutionContext })
+/** Astro Cloudflare adapter の locals.cfContext から ExecutionContext を取得
+ *
+ * Astro v6 で locals.runtime.ctx は廃止され locals.cfContext 直下に変更された
+ * (handler.js の deprecation 警告に「Use Astro.locals.cfContext instead」と明記)
  */
 function getExecutionContext(ctx: APIContext): ExecutionContext | undefined {
-  const runtime = (ctx.locals as { runtime?: { cfContext?: ExecutionContext } })
-    .runtime;
-  return runtime?.cfContext;
+  return (ctx.locals as { cfContext?: ExecutionContext }).cfContext;
 }
 
 /**
