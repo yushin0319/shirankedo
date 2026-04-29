@@ -78,11 +78,13 @@ type PostHandler = (db: AppDatabase, data: unknown) => Promise<Response>;
 
 type NoDbHandler = (request: Request) => Promise<Response>;
 
-/** Astro Cloudflare adapter の locals.runtime.ctx から ExecutionContext を取得 */
+/** Astro Cloudflare adapter の locals.runtime.cfContext から ExecutionContext を取得
+ * (@astrojs/cloudflare v13 の Runtime interface: { cfContext: ExecutionContext })
+ */
 function getExecutionContext(ctx: APIContext): ExecutionContext | undefined {
-  const runtime = (ctx.locals as { runtime?: { ctx?: ExecutionContext } })
+  const runtime = (ctx.locals as { runtime?: { cfContext?: ExecutionContext } })
     .runtime;
-  return runtime?.ctx;
+  return runtime?.cfContext;
 }
 
 /**
