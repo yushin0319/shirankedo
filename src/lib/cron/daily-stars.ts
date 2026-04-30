@@ -7,6 +7,12 @@ const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
+/**
+ * Discord 通知は n8n の api/discord-notify webhook 経由（既存パターン統一）。
+ * crypto-ai-trader / 他 shirankedo cron も同じ経路を使う。
+ */
+const N8N_DISCORD_WEBHOOK =
+  "https://yushin-n8n.duckdns.org/webhook/discord-notify";
 /** D1 INSERT のチャンクサイズ。776 行を 50 行ずつにまとめて subrequest 数を抑える。 */
 const INSERT_CHUNK = 50;
 /**
@@ -26,7 +32,12 @@ export const DAILY_STARS_CRON = "0 18 * * *";
 export interface DailyStarsEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
-  DISCORD_WEBHOOK_URL_DAILY_STARS?: string;
+  /**
+   * n8n の api/discord-notify webhook を叩くための共通 secret。
+   * crypto-ai-trader / 他既存の Discord 通知経路と同じ env 名を使う。
+   * 未設定なら Discord 通知をスキップ。
+   */
+  N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_STARS_ENABLED?: string;
 }
@@ -112,13 +123,16 @@ async function safeFetch(
 }
 
 async function notifyDiscord(
-  url: string,
+  webhookSecret: string,
   message: string,
 ): Promise<{ ok: boolean; error?: string }> {
-  return safeFetch(url, {
+  return safeFetch(N8N_DISCORD_WEBHOOK, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: message }),
+    headers: {
+      "Content-Type": "application/json",
+      "X-Webhook-Secret": webhookSecret,
+    },
+    body: JSON.stringify({ message }),
   });
 }
 
@@ -196,14 +210,14 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }),
   );
 
-  // 5. Discord 通知（dry-run 時はスキップ）
-  if (!dryRun && env.DISCORD_WEBHOOK_URL_DAILY_STARS) {
+  // 5. Discord 通知（dry-run 時はスキップ、n8n の api/discord-notify 経由で送信）
+  if (!dryRun && env.N8N_WEBHOOK_SECRET) {
     let message = summary;
     if (allRenames.length) {
       const lines = allRenames.slice(0, 10).map((r) => `- ${r.from} → ${r.to}`);
       message += `\nリネーム検知:\n${lines.join("\n")}`;
     }
-    const r = await notifyDiscord(env.DISCORD_WEBHOOK_URL_DAILY_STARS, message);
+    const r = await notifyDiscord(env.N8N_WEBHOOK_SECRET, message);
     if (!r.ok) {
       console.log(
         JSON.stringify({ type: "discord_notify_failed", error: r.error }),
