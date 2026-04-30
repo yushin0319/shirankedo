@@ -185,15 +185,26 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }
   }
 
-  // 4. D1 bulk INSERT（dry-run 時はスキップ。50 行/subrequest で Free tier 50 制限内に収める）
+  // 4. D1 bulk INSERT（dry-run 時はスキップ）
+  // subrequest 削減のため `db.batch([...])` で複数 statement を 1 リクエストに集約。
+  // - chunk size 50 の理由: 1 statement あたり 50 行 × 2 カラム = 100 params で
+  //   SQLITE_MAX_VARIABLE_NUMBER=100 上限ピッタリ。これ以上は params 超過で失敗する。
+  // - 2068 リポなら ~42 statements を 1 batch 呼び出しに集約 → subrequest 1 のみ消費。
   let inserted = 0;
   if (!dryRun) {
+    // drizzle d1 の `db.batch()` は readonly tuple `[BatchItem, ...BatchItem[]]` を
+    // 要求するため、動的構築のリストを Parameters 型で受ける。
+    type BatchInput = Parameters<typeof db.batch>[0];
+    const stmts: BatchInput = [] as unknown as BatchInput;
     for (let i = 0; i < allStars.length; i += INSERT_CHUNK) {
       const chunk = allStars.slice(i, i + INSERT_CHUNK);
-      await queryD1("daily_stars.repo_stats.insert_bulk", () =>
-        db.insert(repoStats).values(chunk),
+      (stmts as unknown as unknown[]).push(db.insert(repoStats).values(chunk));
+    }
+    if ((stmts as unknown as unknown[]).length > 0) {
+      await queryD1("daily_stars.repo_stats.insert_batch", () =>
+        db.batch(stmts),
       );
-      inserted += chunk.length;
+      inserted = allStars.length;
     }
   }
 
