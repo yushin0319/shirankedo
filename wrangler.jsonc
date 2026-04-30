@@ -4,11 +4,10 @@
   "compatibility_flags": ["nodejs_compat"],
   // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
   "main": "src/worker.ts",
-  // Cron Trigger: 動作確認用に UTC 06:00 = JST 15:00 へ一時変更（湧心くん帰宅時に確認するため）。
-  // 本番運用切替時に UTC 18:00 = JST 03:00 へ戻す予定。
-  // DAILY_STARS_ENABLED!=="true" の間は dry-run で D1 INSERT・通知をスキップ
+  // Cron Trigger: UTC 18:00 daily = JST 03:00 daily（本番運用、shirankedo daily-stars 専用）。
+  // DAILY_STARS_ENABLED="true" で D1 INSERT・通知・ping を実走、未設定なら dry-run。
   "triggers": {
-    "crons": ["0 6 * * *"]
+    "crons": ["0 18 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {

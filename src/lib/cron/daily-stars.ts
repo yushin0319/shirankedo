@@ -11,9 +11,9 @@ const HC_SLUG = "shirankedo-daily-stars";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * 動作確認用に UTC 06:00 = JST 15:00 で運用中（本番切替時に UTC 18:00 = JST 03:00 へ戻す）。
+ * 本番運用は UTC 18:00 = JST 03:00 daily。
  */
-export const DAILY_STARS_CRON = "0 6 * * *";
+export const DAILY_STARS_CRON = "0 18 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
