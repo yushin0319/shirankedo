@@ -2,7 +2,12 @@
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "../../db/client";
-import { releases, trackingRepos, vulnerabilities } from "../../db/schema";
+import {
+  releases,
+  repoStats,
+  trackingRepos,
+  vulnerabilities,
+} from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
 import {
   releaseSchema,
@@ -133,43 +138,65 @@ export async function processTrackingRepos(
   return { inserted: newItems.length, updated: updateItems.length };
 }
 
-/** repo-renames: 旧名の tracking_repos レコードを削除 */
+/**
+ * repo-renames: GitHub のリポジトリリネームを D1 に反映する。
+ *
+ * - to 不在: from を to にリネーム（tracking_repos と repo_stats 両方の repo を更新）
+ *   → スター履歴を維持したまま新名へ移行できる。
+ * - 両方存在: from を削除（重複解消）。to 側に既に履歴があるので from の repo_stats も破棄。
+ * - from 不在: 何もしない。
+ */
 export async function processRepoRenames(
   db: AppDatabase,
   renames: { from: string; to: string }[],
-): Promise<{ deleted: number }> {
-  if (renames.length === 0) return { deleted: 0 };
+): Promise<{ renamed: number; deleted: number }> {
+  if (renames.length === 0) return { renamed: 0, deleted: 0 };
   const parsed = z.array(repoRenameSchema).parse(renames);
 
+  // CF Workers Free の subrequest 上限 (50) に対し、各 rename で SELECT を 2 回
+  // 走らせると 13 件超で枯渇する。全 from/to を 1 回の inArray SELECT で取得して Set 化。
+  const allNames = [...new Set(parsed.flatMap((r) => [r.from, r.to]))];
+  const existingRows = await queryD1("tracking_repos.check_renames_bulk", () =>
+    db
+      .select({ repo: trackingRepos.repo })
+      .from(trackingRepos)
+      .where(inArray(trackingRepos.repo, allNames)),
+  );
+  const existing = new Set(existingRows.map((r) => r.repo));
+
+  let renamed = 0;
   let deleted = 0;
 
   for (const { from, to } of parsed) {
-    // to が tracking_repos に存在するか確認（存在しなければ skip）
-    const toExists = await queryD1("tracking_repos.check_to", () =>
-      db
-        .select({ repo: trackingRepos.repo })
-        .from(trackingRepos)
-        .where(eq(trackingRepos.repo, to)),
-    );
-    if (toExists.length === 0) continue;
+    if (!existing.has(from)) continue;
 
-    // from が tracking_repos に存在するか確認
-    const fromExists = await queryD1("tracking_repos.check_from", () =>
-      db
-        .select({ repo: trackingRepos.repo })
-        .from(trackingRepos)
-        .where(eq(trackingRepos.repo, from)),
-    );
-    if (fromExists.length === 0) continue;
-
-    // from を tracking_repos から DELETE
-    await queryD1("tracking_repos.delete", () =>
-      db.delete(trackingRepos).where(eq(trackingRepos.repo, from)),
-    );
-    deleted++;
+    if (existing.has(to)) {
+      await queryD1("tracking_repos.delete", () =>
+        db.delete(trackingRepos).where(eq(trackingRepos.repo, from)),
+      );
+      await queryD1("repo_stats.delete_renamed_from", () =>
+        db.delete(repoStats).where(eq(repoStats.repo, from)),
+      );
+      existing.delete(from);
+      deleted++;
+    } else {
+      const now = new Date().toISOString();
+      await queryD1("tracking_repos.rename", () =>
+        db
+          .update(trackingRepos)
+          .set({ repo: to, updatedAt: now })
+          .where(eq(trackingRepos.repo, from)),
+      );
+      await queryD1("repo_stats.rename", () =>
+        db.update(repoStats).set({ repo: to }).where(eq(repoStats.repo, from)),
+      );
+      existing.delete(from);
+      existing.add(to);
+      renamed++;
+    }
   }
 
-  return { deleted };
+  return { renamed, deleted };
 }
 
 /** tracking-repos: GET 一覧 */
