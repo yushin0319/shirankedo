@@ -203,6 +203,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     batches.push(newRepos.slice(i, i + BATCH_SIZE));
   }
 
+  let geminiWarning: string | null = null;
   const translations: TranslatedRepo[] = [];
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
@@ -247,7 +248,8 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
       );
       text = parseGeminiText(resp);
     } catch (e: unknown) {
-      text = ""; // フォールバック確定
+      geminiWarning = geminiWarning ?? String(e); // 最初の失敗を記録
+      text = "";
       console.log(
         JSON.stringify({
           type: "gemini_translate_repos_fallback",
@@ -339,8 +341,10 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-repos 完了 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      severity: geminiWarning ? "warning" : "info",
+      subject: geminiWarning
+        ? `⚠️ shirankedo daily-repos 完了(AI翻訳失敗) (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-repos 完了 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
       summary,
     });
     if (!r.ok)

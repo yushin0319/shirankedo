@@ -136,6 +136,7 @@ JSONのみ出力してください。`;
 
   const geminiBody = buildGeminiRequest({ prompt, temperature: 0.7 });
 
+  let geminiWarning: string | null = null;
   let apiBody = {
     comment: "",
     vulnIds: [] as string[],
@@ -154,7 +155,8 @@ JSONのみ出力してください。`;
       releaseIds: result.release_ids ?? [],
     };
   } catch (e: unknown) {
-    apiBody = { comment: "", vulnIds: [], releaseIds: [] }; // フォールバック確定
+    geminiWarning = String(e); // Gemini失敗記録
+    apiBody = { comment: "", vulnIds: [], releaseIds: [] };
     console.log(
       JSON.stringify({
         type: "gemini_security_failed",
@@ -193,8 +195,10 @@ JSONのみ出力してください。`;
 
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-security 完了 (${(durationMs / 1000).toFixed(1)}s)`,
+      severity: geminiWarning ? "warning" : "info",
+      subject: geminiWarning
+        ? `⚠️ shirankedo daily-security 完了(AI生成失敗) (${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-security 完了 (${(durationMs / 1000).toFixed(1)}s)`,
       summary,
     });
     if (!r.ok)

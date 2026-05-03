@@ -137,6 +137,7 @@ JSONのみ出力してください。`;
       thinkingBudget: 0,
     });
 
+    let geminiWarning: string | null = null;
     let titles = fallbackTitles;
     try {
       const resp = await callGemini(
@@ -146,7 +147,8 @@ JSONのみ出力してください。`;
       );
       titles = parseGeminiJson<{ index: number; title: string }[]>(resp);
     } catch (e: unknown) {
-      titles = fallbackTitles; // フォールバック確定
+      geminiWarning = String(e); // Gemini失敗記録
+      titles = fallbackTitles;
       console.log(
         JSON.stringify({
           type: "gemini_translate_fallback",
@@ -197,8 +199,10 @@ JSONのみ出力してください。`;
 
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-vulns 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      severity: geminiWarning ? "warning" : "info",
+      subject: geminiWarning
+        ? `⚠️ shirankedo daily-vulns 完了(AI翻訳失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-vulns 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
       summary,
     });
     if (!r.ok)

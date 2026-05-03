@@ -320,6 +320,7 @@ JSONのみ出力してください。`;
     thinkingBudget: 0,
   });
 
+  let geminiWarning: string | null = null;
   let selectionResult: SelectionResult = { articles: [] };
   try {
     const resp = await callGemini(
@@ -329,7 +330,8 @@ JSONのみ出力してください。`;
     );
     selectionResult = parseGeminiJson<SelectionResult>(resp);
   } catch (e: unknown) {
-    selectionResult = { articles: [] }; // フォールバック確定
+    geminiWarning = String(e); // Gemini選定失敗を記録
+    selectionResult = { articles: [] };
     console.log(
       JSON.stringify({ type: "gemini_selection_failed", error: String(e) }),
     );
@@ -479,7 +481,8 @@ JSONのみ出力してください。`;
     const parsed = parseGeminiJson<SummaryEntry[]>(resp);
     summaries = Array.isArray(parsed) ? parsed : [];
   } catch (e: unknown) {
-    summaries = []; // フォールバック確定
+    geminiWarning = geminiWarning ?? String(e); // Gemini要約失敗を記録
+    summaries = [];
     console.log(
       JSON.stringify({ type: "gemini_summarize_failed", error: String(e) }),
     );
@@ -537,8 +540,10 @@ JSONのみ出力してください。`;
 
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-articles 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      severity: geminiWarning ? "warning" : "info",
+      subject: geminiWarning
+        ? `⚠️ shirankedo daily-articles 完了(AI処理失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-articles 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
       summary,
     });
     if (!r.ok)
