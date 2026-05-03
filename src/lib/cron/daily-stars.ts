@@ -8,11 +8,10 @@ const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /**
- * Discord 通知は n8n の api/discord-notify webhook 経由（既存パターン統一）。
- * crypto-ai-trader / 他 shirankedo cron も同じ経路を使う。
+ * 観測性通知は n8n の api/obs-notify 経由 (#529)。
+ * severity 別 Discord channel + Notion 観測性ログ DB は obs-notify WF が担当。
  */
-const N8N_DISCORD_WEBHOOK =
-  "https://yushin-n8n.duckdns.org/webhook/discord-notify";
+const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 /** D1 INSERT のチャンクサイズ。776 行を 50 行ずつにまとめて subrequest 数を抑える。 */
 const INSERT_CHUNK = 50;
 /**
@@ -33,9 +32,8 @@ export interface DailyStarsEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
   /**
-   * n8n の api/discord-notify webhook を叩くための共通 secret。
-   * crypto-ai-trader / 他既存の Discord 通知経路と同じ env 名を使う。
-   * 未設定なら Discord 通知をスキップ。
+   * n8n の api/obs-notify webhook を叩くための共通 secret (#529)。
+   * 未設定なら通知をスキップ。
    */
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
@@ -122,17 +120,26 @@ async function safeFetch(
   }
 }
 
-async function notifyDiscord(
+async function notifyObs(
   webhookSecret: string,
-  message: string,
+  payload: {
+    severity: "critical" | "warning" | "info";
+    subject: string;
+    summary?: string;
+    raw_payload?: unknown;
+  },
 ): Promise<{ ok: boolean; error?: string }> {
-  return safeFetch(N8N_DISCORD_WEBHOOK, {
+  return safeFetch(N8N_OBS_NOTIFY, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "X-Webhook-Secret": webhookSecret,
     },
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({
+      ...payload,
+      service: "cf-worker",
+      repo: "shirankedo",
+    }),
   });
 }
 
@@ -221,17 +228,21 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }),
   );
 
-  // 5. Discord 通知（dry-run 時はスキップ、n8n の api/discord-notify 経由で送信）
+  // 5. 観測性通知（dry-run 時はスキップ、n8n obs-notify 経由 / severity=info）
   if (!dryRun && env.N8N_WEBHOOK_SECRET) {
-    let message = summary;
+    let summaryText = summary;
     if (allRenames.length) {
       const lines = allRenames.slice(0, 10).map((r) => `- ${r.from} → ${r.to}`);
-      message += `\nリネーム検知:\n${lines.join("\n")}`;
+      summaryText += `\nリネーム検知:\n${lines.join("\n")}`;
     }
-    const r = await notifyDiscord(env.N8N_WEBHOOK_SECRET, message);
+    const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
+      severity: "info",
+      subject: `✅ shirankedo daily-stars 完了 (${allStars.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: summaryText,
+    });
     if (!r.ok) {
       console.log(
-        JSON.stringify({ type: "discord_notify_failed", error: r.error }),
+        JSON.stringify({ type: "obs_notify_failed", error: r.error }),
       );
     }
   }
