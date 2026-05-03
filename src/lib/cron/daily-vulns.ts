@@ -106,6 +106,7 @@ export async function runDailyVulns(env: DailyVulnsEnv): Promise<void> {
   );
 
   let apiBody: VulnForApi[] = [];
+  let geminiWarning: string | null = null;
 
   if (vulns.length > 0) {
     // 3. Gemini 翻訳（一括）。失敗時は英語説明から短縮タイトルをフォールバック生成
@@ -137,7 +138,6 @@ JSONのみ出力してください。`;
       thinkingBudget: 0,
     });
 
-    let geminiWarning: string | null = null;
     let titles = fallbackTitles;
     try {
       const resp = await callGemini(
