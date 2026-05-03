@@ -1,22 +1,42 @@
 import { handle } from "@astrojs/cloudflare/handler";
 import {
+  type DailyArticlesEnv,
+  runDailyArticles,
+} from "./lib/cron/daily-articles";
+import {
+  type DailyReleasesEnv,
+  runDailyReleases,
+} from "./lib/cron/daily-releases";
+import { type DailyReposEnv, runDailyRepos } from "./lib/cron/daily-repos";
+import {
+  type DailySecurityEnv,
+  runDailySecurity,
+} from "./lib/cron/daily-security";
+import {
   DAILY_STARS_CRON,
   type DailyStarsEnv,
-  pingHealthchecks,
+  pingHealthchecks as pingHcStars,
   runDailyStars,
 } from "./lib/cron/daily-stars";
+import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 
-// Worker entrypoint: HTTP は Astro adapter (handle) に委譲、cron は scheduled で受ける。
-// env は wrangler.jsonc の bindings + secrets から構築される。Astro 側の env 型
-// （src/env.d.ts の cloudflare:workers モジュール）を base にし、cron 用 secret を
-// `DailyStarsEnv` で追加する形（main の env.d.ts に余計な型を増やさない方針）。
+// UTC 15:00 = JST 00:00: articles + vulns + releases + security（並列）
+const DAILY_BATCH_CRON = "0 15 * * *";
+// UTC 18:30 = JST 03:30: repos
+const DAILY_REPOS_CRON = "30 18 * * *";
+
 type WorkerEnv = {
   DB: D1Database;
   KV: KVNamespace;
   INGEST_API_KEY: string;
   SENTRY_DSN?: string;
   SENTRY_RELEASE?: string;
-} & DailyStarsEnv;
+} & DailyStarsEnv &
+  DailyArticlesEnv &
+  DailyReleasesEnv &
+  DailyVulnsEnv &
+  DailySecurityEnv &
+  DailyReposEnv;
 
 interface WorkerScheduledController {
   cron: string;
@@ -35,6 +55,17 @@ interface WorkerHandler {
   ): Promise<void>;
 }
 
+function logCronError(name: string, e: unknown): void {
+  console.log(
+    JSON.stringify({
+      type: "cron_failed",
+      cron: name,
+      error: String(e),
+      stack: e instanceof Error ? e.stack : undefined,
+    }),
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
     return handle(request, env, ctx);
@@ -42,22 +73,11 @@ export default {
   async scheduled(controller, env, ctx) {
     switch (controller.cron) {
       case DAILY_STARS_CRON: {
-        // UTC 18:00 = JST 03:00 daily: shirankedo-daily-stars
         ctx.waitUntil(
           runDailyStars(env).catch(async (e) => {
-            console.log(
-              JSON.stringify({
-                type: "daily_stars_failed",
-                error: String(e),
-                stack: e instanceof Error ? e.stack : undefined,
-              }),
-            );
+            logCronError("daily-stars", e);
             if (env.HC_PING_KEY) {
-              const r = await pingHealthchecks(
-                env.HC_PING_KEY,
-                false,
-                String(e),
-              );
+              const r = await pingHcStars(env.HC_PING_KEY, false, String(e));
               if (!r.ok) {
                 console.log(
                   JSON.stringify({
@@ -71,6 +91,48 @@ export default {
         );
         break;
       }
+
+      case DAILY_BATCH_CRON: {
+        // articles / vulns / releases / security を並列実行
+        // Promise.allSettled で1つ失敗しても他が止まらないようにする
+        ctx.waitUntil(
+          Promise.allSettled([
+            runDailyArticles(env).catch((e) => {
+              logCronError("daily-articles", e);
+            }),
+            runDailyVulns(env).catch((e) => {
+              logCronError("daily-vulns", e);
+            }),
+            runDailyReleases(env).catch((e) => {
+              logCronError("daily-releases", e);
+            }),
+            runDailySecurity(env).catch((e) => {
+              logCronError("daily-security", e);
+            }),
+          ]).then((results) => {
+            const failed = results.filter((r) => r.status === "rejected");
+            if (failed.length > 0) {
+              console.log(
+                JSON.stringify({
+                  type: "daily_batch_partial_failure",
+                  failed_count: failed.length,
+                }),
+              );
+            }
+          }),
+        );
+        break;
+      }
+
+      case DAILY_REPOS_CRON: {
+        ctx.waitUntil(
+          runDailyRepos(env).catch((e) => {
+            logCronError("daily-repos", e);
+          }),
+        );
+        break;
+      }
+
       default:
         console.log(
           JSON.stringify({ type: "cron_unhandled", cron: controller.cron }),
