@@ -52,7 +52,10 @@ function buildReleaseBatches(
     const parts = batch.map((repo, idx) => {
       const [owner, name] = repo.split("/");
       const alias = `r${batchIndex}_${idx}`;
-      return `${alias}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
+      // releases(first: 1) で GraphQL cost を 1/5 に削減 (1 hour rate limit 5000 points 内)。
+      // 48h cutoff フィルタを後段で行うので first:1 で十分 (ほとんどのリポは 48h 内に
+      // major/minor リリース 1 件程度、複数積む場合は次日 cron で拾う)。
+      return `${alias}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
     });
     batches.push({ query: `{${parts.join(" ")}}`, batchIndex });
   }
