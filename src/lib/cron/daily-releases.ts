@@ -40,22 +40,18 @@ function buildReleaseBatches(
   const valid = repos.filter((r) => r?.includes("/"));
   if (valid.length === 0) return [];
 
-  // batch サイズ 40 + first:5 (= 5/3 17:30 で release が +40件 D1 INSERT 成功した
-  // 当時の構成に戻す)。 batch 50 + first:1 では複数仮説が破綻したので、 動作実績のある
-  // 構成 + 5xx retry の組み合わせで再検証する。
-  const BATCH_SIZE = 40;
-  const batches = [];
-  for (let i = 0; i < valid.length; i += BATCH_SIZE) {
-    const batch = valid.slice(i, i + BATCH_SIZE);
-    const batchIndex = Math.floor(i / BATCH_SIZE);
-    const parts = batch.map((repo, idx) => {
-      const [owner, name] = repo.split("/");
-      const alias = `r${batchIndex}_${idx}`;
-      return `${alias}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
-    });
-    batches.push({ query: `{${parts.join(" ")}}`, batchIndex });
-  }
-  return batches;
+  // 全リポを 1 GraphQL query (alias 並列) にまとめる。
+  // - subrequest 1 のみ消費 (Cloudflare Workers Free Tier の 50 limit 内余裕)
+  // - wall time 1-2 秒で完了 (GitHub が 1 query を server-side 並列処理)
+  // - GraphQL cost = N × first:1 = N (rate limit 5000 / hour 内)
+  // - request body ~150 chars/repo × 2143 = ~320KB (GitHub 1MB 限界内)
+  // 旧実装は 40 件 batch × 53 batch loop で sequential + retry sleep 累積で
+  // CF Workers の wall time 15min に近づき silent kill していた。
+  const parts = valid.map((repo, i) => {
+    const [owner, name] = repo.split("/");
+    return `r${i}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
+  });
+  return [{ query: `{${parts.join(" ")}}`, batchIndex: 0 }];
 }
 
 function extractReleases(repoData: RepoResponse, cutoff: string): ReleaseRow[] {
