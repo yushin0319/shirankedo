@@ -17,10 +17,11 @@ import {
 } from "./schemas";
 
 // D1 は 1 prepared statement あたり最大 100 bound parameter。
-// 各テーブルの INSERT 列数（5 列前後）に対し余裕を持たせて 20 行ずつに分割する。
-// また CF Workers Free の subrequest 上限（50）に対し、50 行以上のループ INSERT で
-// 枯渇するため、bulk INSERT + chunk で subrequest 数を大幅に削減する。
-const INSERT_CHUNK_SIZE = 20;
+// SQLite は 1 statement あたり最大 999 個の bind 変数。 各テーブル INSERT 列数
+// (5 列前後) × 100 行 = 500 params で安全。chunk を大きくすることで CF Workers
+// Free の subrequest 上限 50 に対する D1 query 数を大幅削減 (旧 20 → 100 で
+// 5 倍効率、release 40 件なら 1 chunk = 1 subreq)。
+const INSERT_CHUNK_SIZE = 100;
 
 /** vulnerabilities: UPSERT（cvssScore 更新あり） */
 export async function processVulnerabilities(
