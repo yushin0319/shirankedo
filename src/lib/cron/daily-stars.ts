@@ -16,9 +16,9 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * [一時テスト] UTC 13:15 = JST 22:15 (revert PR で本番 UTC 18:00 = JST 03:00 に戻す)。
+ * [一時テスト] UTC 13:55 = JST 22:55 (revert PR で本番 UTC 18:00 = JST 03:00 に戻す)。
  */
-export const DAILY_STARS_CRON = "15 13 * * *";
+export const DAILY_STARS_CRON = "55 13 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
