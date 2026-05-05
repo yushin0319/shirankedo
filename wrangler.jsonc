@@ -5,14 +5,14 @@
   // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
   "main": "src/worker.ts",
   // Cron Triggers（最大3本）:
-  //   [一時テスト] UTC 07:50 = JST 16:50: articles / vulns / releases / security（並列）
-  //   [一時テスト] UTC 07:55 = JST 16:55: stars
-  //   [一時テスト] UTC 08:00 = JST 17:00: repos
+  //   [一時テスト] UTC 08:30 = JST 17:30: articles / vulns / releases / security（並列）
+  //   [一時テスト] UTC 08:35 = JST 17:35: stars
+  //   [一時テスト] UTC 08:40 = JST 17:40: repos
   // PR #137 の cron 修正 (self-fetch → 直接 D1) を本番動作確認するため一時的に
   // 平日昼間に発火させる。確認後に元の深夜 schedule に戻す revert PR を出す。
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["50 7 * * *", "55 7 * * *", "0 8 * * *"]
+    "crons": ["30 8 * * *", "35 8 * * *", "40 8 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
