@@ -106,6 +106,16 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   const dryRun = env.DAILY_RELEASES_ENABLED !== "true";
   const db = getDb(env.DB);
 
+  // [DIAGNOSTICS] cron entry に到達したか確認するため、即時 fire-and-forget で通知。
+  // release が依然無音化する真因 (cron 起動失敗 vs 後段失敗) を切り分け、特定後に削除。
+  if (env.N8N_WEBHOOK_SECRET) {
+    notifyObs(env.N8N_WEBHOOK_SECRET, {
+      severity: "info",
+      subject: "🟡 shirankedo daily-releases START (debug)",
+      summary: `entry @ ${new Date().toISOString()}`,
+    }).catch(() => {});
+  }
+
   // 1. tracking-repos 取得 (D1 直接)
   const trackingData = await getTrackingRepos(db);
   const repos = trackingData.map((r) => r.repo);
