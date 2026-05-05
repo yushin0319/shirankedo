@@ -20,10 +20,10 @@ import {
 } from "./lib/cron/daily-stars";
 import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 
-// [一時テスト] UTC 13:10 = JST 22:10: articles + vulns + releases + security（並列）
-const DAILY_BATCH_CRON = "10 13 * * *";
-// [一時テスト] UTC 13:20 = JST 22:20: repos
-const DAILY_REPOS_CRON = "20 13 * * *";
+// [一時テスト] UTC 13:50 = JST 22:50: articles + vulns + security（並列）
+const DAILY_BATCH_CRON = "50 13 * * *";
+// [一時テスト] UTC 14:00 = JST 23:00: repos + release（2 並列）
+const DAILY_REPOS_CRON = "0 14 * * *";
 
 type WorkerEnv = {
   DB: D1Database;
@@ -93,8 +93,9 @@ export default {
       }
 
       case DAILY_BATCH_CRON: {
-        // articles / vulns / releases / security を並列実行
-        // Promise.allSettled で1つ失敗しても他が止まらないようにする
+        // articles / vulns / security を並列実行 (release は subreq 50 limit 突破で
+        // 通知無音化したため REPOS_CRON 側に移動した。Promise.allSettled で 1 つ失敗
+        // しても他が止まらないようにする)
         ctx.waitUntil(
           Promise.allSettled([
             runDailyArticles(env).catch((e) => {
@@ -102,9 +103,6 @@ export default {
             }),
             runDailyVulns(env).catch((e) => {
               logCronError("daily-vulns", e);
-            }),
-            runDailyReleases(env).catch((e) => {
-              logCronError("daily-releases", e);
             }),
             runDailySecurity(env).catch((e) => {
               logCronError("daily-security", e);
@@ -125,10 +123,17 @@ export default {
       }
 
       case DAILY_REPOS_CRON: {
+        // repos + release を並列実行。BATCH cron で並列 4 本にすると subreq 50 limit
+        // 突破で release だけが silently 失敗していたため、こちらの 2 並列に分離。
         ctx.waitUntil(
-          runDailyRepos(env).catch((e) => {
-            logCronError("daily-repos", e);
-          }),
+          Promise.allSettled([
+            runDailyRepos(env).catch((e) => {
+              logCronError("daily-repos", e);
+            }),
+            runDailyReleases(env).catch((e) => {
+              logCronError("daily-releases", e);
+            }),
+          ]),
         );
         break;
       }
