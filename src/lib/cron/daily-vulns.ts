@@ -1,18 +1,20 @@
+import { getDb } from "../../db/client";
+import { processVulnerabilities } from "../api/ingest-upsert";
+import { getVulnerabilityCveIds } from "../api/ingest-vulns-read";
 import {
   buildGeminiRequest,
   callGemini,
   notifyObs,
   parseGeminiJson,
   pingHealthchecks,
-  postIngest,
   sanitizeForPrompt,
 } from "./cron-shared";
 
 const HC_SLUG = "shirankedo-daily-vulns";
 
 export interface DailyVulnsEnv {
+  DB: D1Database;
   GEMINI_API_KEY: string;
-  INGEST_API_KEY: string;
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_VULNS_ENABLED?: string;
@@ -47,32 +49,27 @@ interface VulnForApi {
 export async function runDailyVulns(env: DailyVulnsEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_VULNS_ENABLED !== "true";
+  const db = getDb(env.DB);
 
   console.log(JSON.stringify({ type: "daily_vulns_start", dry_run: dryRun }));
 
-  // 1. 並列: NVD API（過去48h）+ 既存 CVE IDs
+  // 1. NVD API（過去48h）と 既存 CVE IDs (D1 直接) を並列で
   const now = new Date();
   const past = new Date(now.getTime() - 48 * 60 * 60 * 1000);
   const fmt = (d: Date) => d.toISOString().replace("Z", "");
   const nvdUrl = `https://services.nvd.nist.gov/rest/json/cves/2.0?pubStartDate=${fmt(past)}&pubEndDate=${fmt(now)}`;
 
-  const [nvdRes, existingRes] = await Promise.all([
+  const [nvdRes, existingIdsList] = await Promise.all([
     fetch(nvdUrl),
-    fetch(
-      "https://shirankedo.y-fudo.workers.dev/api/ingest/vulnerabilities/cve-ids",
-      { headers: { "X-API-Key": env.INGEST_API_KEY } },
-    ),
+    getVulnerabilityCveIds(db),
   ]);
 
   if (!nvdRes.ok) throw new Error(`NVD API HTTP ${nvdRes.status}`);
-  if (!existingRes.ok)
-    throw new Error(`existing CVE IDs HTTP ${existingRes.status}`);
 
   const nvdData = (await nvdRes.json()) as {
     vulnerabilities?: NvdCveEntry[];
   };
-  const existingData = (await existingRes.json()) as { data?: string[] };
-  const existingIds = new Set(existingData.data ?? []);
+  const existingIds = new Set(existingIdsList);
 
   // 2. パース: CVSS >= 8.0 + 既存除外
   const vulns: ParsedVuln[] = [];
@@ -182,28 +179,31 @@ JSONのみ出力してください。`;
 
   if (dryRun) return;
 
+  let postFailed: string | null = null;
   if (apiBody.length > 0) {
-    const postRes = await postIngest(
-      "vulnerabilities",
-      env.INGEST_API_KEY,
-      apiBody,
-    );
-    if (!postRes.ok)
+    try {
+      await processVulnerabilities(db, apiBody);
+    } catch (e: unknown) {
+      postFailed = String(e);
       console.log(
         JSON.stringify({
           type: "daily_vulns_post_failed",
-          error: postRes.error,
+          error: postFailed,
         }),
       );
+    }
   }
 
   if (env.N8N_WEBHOOK_SECRET) {
+    const ok = !postFailed && !geminiWarning;
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: geminiWarning ? "warning" : "info",
-      subject: geminiWarning
-        ? `⚠️ shirankedo daily-vulns 完了(AI翻訳失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
-        : `✅ shirankedo daily-vulns 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary,
+      severity: ok ? "info" : "warning",
+      subject: postFailed
+        ? `❌ shirankedo daily-vulns DB書込失敗 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : geminiWarning
+          ? `⚠️ shirankedo daily-vulns 完了(AI翻訳失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+          : `✅ shirankedo daily-vulns 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
     });
     if (!r.ok)
       console.log(
@@ -212,7 +212,12 @@ JSONのみ出力してください。`;
   }
 
   if (env.HC_PING_KEY) {
-    const r = await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
+    const r = await pingHealthchecks(
+      env.HC_PING_KEY,
+      HC_SLUG,
+      !postFailed,
+      summary,
+    );
     if (!r.ok)
       console.log(JSON.stringify({ type: "hc_ping_failed", error: r.error }));
   }

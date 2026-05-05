@@ -1,17 +1,14 @@
-import {
-  notifyObs,
-  pingHealthchecks,
-  postIngest,
-  sanitizeGitHubName,
-} from "./cron-shared";
+import { getDb } from "../../db/client";
+import { getTrackingRepos, processReleases } from "../api/ingest-upsert";
+import { notifyObs, pingHealthchecks, sanitizeGitHubName } from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200;
 const HC_SLUG = "shirankedo-daily-releases";
 
 export interface DailyReleasesEnv {
+  DB: D1Database;
   GITHUB_TOKEN: string;
-  INGEST_API_KEY: string;
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_RELEASES_ENABLED?: string;
@@ -99,18 +96,11 @@ function extractReleases(repoData: RepoResponse, cutoff: string): ReleaseRow[] {
 export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_RELEASES_ENABLED !== "true";
+  const db = getDb(env.DB);
 
-  // 1. tracking-repos 取得
-  const trackingRes = await fetch(
-    "https://shirankedo.y-fudo.workers.dev/api/ingest/tracking-repos",
-    { headers: { "X-API-Key": env.INGEST_API_KEY } },
-  );
-  if (!trackingRes.ok)
-    throw new Error(`tracking-repos HTTP ${trackingRes.status}`);
-  const trackingData = (await trackingRes.json()) as {
-    data: { repo: string }[];
-  };
-  const repos = (trackingData.data ?? []).map((r) => r.repo);
+  // 1. tracking-repos 取得 (D1 直接)
+  const trackingData = await getTrackingRepos(db);
+  const repos = trackingData.map((r) => r.repo);
 
   console.log(
     JSON.stringify({
@@ -167,28 +157,30 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
 
   if (dryRun) return;
 
-  // 3. POST
+  // 3. INSERT (D1 直接)
+  let postFailed: string | null = null;
   if (allReleases.length > 0) {
-    const postRes = await postIngest(
-      "releases",
-      env.INGEST_API_KEY,
-      allReleases,
-    );
-    if (!postRes.ok)
+    try {
+      await processReleases(db, allReleases);
+    } catch (e: unknown) {
+      postFailed = String(e);
       console.log(
         JSON.stringify({
           type: "daily_releases_post_failed",
-          error: postRes.error,
+          error: postFailed,
         }),
       );
+    }
   }
 
   // 4. obs-notify + HC ping
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-releases 完了 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary,
+      severity: postFailed ? "warning" : "info",
+      subject: postFailed
+        ? `❌ shirankedo daily-releases DB書込失敗 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-releases 完了 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
     });
     if (!r.ok)
       console.log(
@@ -197,7 +189,12 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   }
 
   if (env.HC_PING_KEY) {
-    const r = await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
+    const r = await pingHealthchecks(
+      env.HC_PING_KEY,
+      HC_SLUG,
+      !postFailed,
+      summary,
+    );
     if (!r.ok)
       console.log(JSON.stringify({ type: "hc_ping_failed", error: r.error }));
   }
