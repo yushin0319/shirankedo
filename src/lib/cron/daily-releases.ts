@@ -40,12 +40,11 @@ function buildReleaseBatches(
   const valid = repos.filter((r) => r?.includes("/"));
   if (valid.length === 0) return [];
 
-  // batch サイズ 200 (GitHub GraphQL 1 query で 200 リポ × 1 リリース = 200 nodes、
-  // GitHub maxNodeLimit 500,000 内かつ first:1 で cost も 200。BATCH_CRON 内の
-  // 4 並列 cron が同一 invocation で subrequest 50 limit を共有するため、
-  // release の GraphQL を batch=200 で 22→11 batch に圧縮し、合計 subreq を
-  // 47→36 に減らす。並列実行順で release の obs/hc が後段になっても 50 内に収まる。)
-  const BATCH_SIZE = 200;
+  // batch サイズ 50 (GitHub GraphQL の複雑度上限 + Cloudflare-fronted 502 対策)。
+  // 200 件 batch では 1 batch 目から HTTP 502 (Cloudflare error code: 502) で
+  // 即死していたため、 50 件 (= 元の stars と同じ安全圏) に戻す。
+  // 各 batch に 502/503/504 リトライを仕込んで一時的な 502 を吸収する (下記 fetch ループ)。
+  const BATCH_SIZE = 50;
   const batches = [];
   for (let i = 0; i < valid.length; i += BATCH_SIZE) {
     const batch = valid.slice(i, i + BATCH_SIZE);
@@ -142,29 +141,44 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
     const allReleases: ReleaseRow[] = [];
     debugStage(env, "BUILT_BATCHES", `${batches.length} batches`);
 
-    // 2. GraphQL バッチ取得
+    // 2. GraphQL バッチ取得 (5xx は retry、 4xx は即 throw)
     for (let i = 0; i < batches.length; i++) {
       const batch = batches[i];
-      const res = await fetch(GH_GRAPHQL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-          "Content-Type": "application/json",
-          "User-Agent": "shirankedo-daily-releases/1.0",
-        },
-        body: JSON.stringify({ query: batch.query }),
-      });
-      if (!res.ok) {
+      let res: Response | null = null;
+      const MAX_ATTEMPTS = 3;
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        res = await fetch(GH_GRAPHQL, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+            "Content-Type": "application/json",
+            "User-Agent": "shirankedo-daily-releases/1.0",
+          },
+          body: JSON.stringify({ query: batch.query }),
+        });
+        if (res.ok) break;
+        // 5xx は GitHub 一時的 (Cloudflare 502 等)、 retry 価値あり
+        if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+          debugStage(
+            env,
+            `GRAPHQL_RETRY_batch_${batch.batchIndex}`,
+            `HTTP ${res.status} attempt=${attempt}, sleep ${attempt}s`,
+          );
+          await new Promise((r) => setTimeout(r, attempt * 1000));
+          continue;
+        }
+        // 4xx か 5xx 最終失敗
         const body = await res.text().catch(() => "(read fail)");
         debugStage(
           env,
           `GRAPHQL_FAIL_batch_${batch.batchIndex}`,
-          `HTTP ${res.status}: ${body.substring(0, 300)}`,
+          `HTTP ${res.status} (attempt=${attempt}): ${body.substring(0, 300)}`,
         );
         throw new Error(
-          `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex}`,
+          `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex} (after ${attempt} attempts)`,
         );
       }
+      if (!res) throw new Error("unreachable");
 
       const json = (await res.json()) as {
         data?: Record<string, RepoResponse | null>;

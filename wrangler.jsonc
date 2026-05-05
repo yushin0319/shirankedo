@@ -12,7 +12,7 @@
   // 平日昼間に発火させる。確認後に元の深夜 schedule に戻す revert PR を出す。
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["50 13 * * *", "55 13 * * *", "55 15 * * *"]
+    "crons": ["50 13 * * *", "55 13 * * *", "30 16 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
