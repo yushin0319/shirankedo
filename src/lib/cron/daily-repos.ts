@@ -1,10 +1,12 @@
+import { getDb } from "../../db/client";
+import { processRepoStats } from "../api/ingest-simple";
+import { getTrackingRepos, processTrackingRepos } from "../api/ingest-upsert";
 import {
   buildGeminiRequest,
   callGemini,
   notifyObs,
   parseGeminiText,
   pingHealthchecks,
-  postIngest,
   sanitizeForPrompt,
 } from "./cron-shared";
 
@@ -13,9 +15,9 @@ const SEARCH_DELAY_MS = 2000;
 const HC_SLUG = "shirankedo-daily-repos";
 
 export interface DailyReposEnv {
+  DB: D1Database;
   GITHUB_TOKEN: string;
   GEMINI_API_KEY: string;
-  INGEST_API_KEY: string;
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_REPOS_ENABLED?: string;
@@ -88,20 +90,11 @@ function buildSearchQueries(): string[] {
 export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_REPOS_ENABLED !== "true";
+  const db = getDb(env.DB);
 
-  // 1. 既存リポ一覧取得
-  const existingRes = await fetch(
-    "https://shirankedo.y-fudo.workers.dev/api/ingest/tracking-repos",
-    { headers: { "X-API-Key": env.INGEST_API_KEY } },
-  );
-  if (!existingRes.ok)
-    throw new Error(`tracking-repos HTTP ${existingRes.status}`);
-  const existingData = (await existingRes.json()) as {
-    data?: { repo: string }[];
-  };
-  const existingSet = new Set(
-    (existingData.data ?? []).map((r) => r.repo.toLowerCase()),
-  );
+  // 1. 既存リポ一覧取得 (D1 直接)
+  const existingData = await getTrackingRepos(db);
+  const existingSet = new Set(existingData.map((r) => r.repo.toLowerCase()));
 
   console.log(
     JSON.stringify({
@@ -295,7 +288,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
   if (dryRun) return;
 
-  // 5. tracking-repos POST（50件チャンク）
+  // 5. tracking-repos UPSERT (D1 直接、50件チャンク)
   const CHUNK_SIZE = 50;
   for (let i = 0; i < translations.length; i += CHUNK_SIZE) {
     const chunk = translations.slice(i, i + CHUNK_SIZE).map((r) => ({
@@ -304,39 +297,35 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
       description: r.description,
       language: r.language,
     }));
-    const postRes = await postIngest(
-      "tracking-repos",
-      env.INGEST_API_KEY,
-      chunk,
-    );
-    if (!postRes.ok)
+    try {
+      await processTrackingRepos(db, chunk);
+    } catch (e: unknown) {
       console.log(
         JSON.stringify({
           type: "daily_repos_post_failed",
           chunk: Math.floor(i / CHUNK_SIZE),
-          error: postRes.error,
+          error: String(e),
         }),
       );
+    }
   }
 
-  // 6. repo-stats POST（新規リポのスター数）
+  // 6. repo-stats INSERT (D1 直接、新規リポのスター数)
   const statsBody = translations.map((r) => ({
     repo: r.repo,
     stars: r.stars,
   }));
   if (statsBody.length > 0) {
-    const statsRes = await postIngest(
-      "repo-stats",
-      env.INGEST_API_KEY,
-      statsBody,
-    );
-    if (!statsRes.ok)
+    try {
+      await processRepoStats(db, statsBody);
+    } catch (e: unknown) {
       console.log(
         JSON.stringify({
           type: "daily_repos_stats_post_failed",
-          error: statsRes.error,
+          error: String(e),
         }),
       );
+    }
   }
 
   if (env.N8N_WEBHOOK_SECRET) {

@@ -1,40 +1,23 @@
+import { getDb } from "../../db/client";
+import { getSecurityTop } from "../api/ingest-security-read";
+import { processSecurityDaily } from "../api/ingest-simple";
 import {
   buildGeminiRequest,
   callGemini,
   notifyObs,
   parseGeminiJson,
   pingHealthchecks,
-  postIngest,
   sanitizeForPrompt,
 } from "./cron-shared";
 
 const HC_SLUG = "shirankedo-daily-security";
 
 export interface DailySecurityEnv {
+  DB: D1Database;
   GEMINI_API_KEY: string;
-  INGEST_API_KEY: string;
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_SECURITY_ENABLED?: string;
-}
-
-interface VulnEntry {
-  cveId: string;
-  title: string;
-  cvssScore?: number | null;
-  publishedAt: string;
-}
-
-interface ReleaseEntry {
-  repo: string;
-  tag: string;
-  type: string;
-  publishedAt: string;
-}
-
-interface SummaryEntry {
-  content: string;
-  createdAt: string;
 }
 
 interface SecurityComment {
@@ -46,26 +29,14 @@ interface SecurityComment {
 export async function runDailySecurity(env: DailySecurityEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_SECURITY_ENABLED !== "true";
+  const db = getDb(env.DB);
 
   console.log(
     JSON.stringify({ type: "daily_security_start", dry_run: dryRun }),
   );
 
-  // 1. security-top 取得
-  const topRes = await fetch(
-    "https://shirankedo.y-fudo.workers.dev/api/ingest/security-top",
-    { headers: { "X-API-Key": env.INGEST_API_KEY } },
-  );
-  if (!topRes.ok) throw new Error(`security-top HTTP ${topRes.status}`);
-
-  const topData = (await topRes.json()) as {
-    data?: {
-      vulns: VulnEntry[];
-      releases: ReleaseEntry[];
-      weeklySummaries: SummaryEntry[];
-    };
-  };
-  const data = topData.data ?? { vulns: [], releases: [], weeklySummaries: [] };
+  // 1. security-top 取得 (D1 直接)
+  const data = await getSecurityTop(db);
   const { vulns, releases, weeklySummaries } = data;
 
   console.log(
@@ -179,18 +150,16 @@ JSONのみ出力してください。`;
   if (dryRun) return;
 
   if (apiBody.comment) {
-    const postRes = await postIngest(
-      "security-daily",
-      env.INGEST_API_KEY,
-      apiBody,
-    );
-    if (!postRes.ok)
+    try {
+      await processSecurityDaily(db, apiBody);
+    } catch (e: unknown) {
       console.log(
         JSON.stringify({
           type: "daily_security_post_failed",
-          error: postRes.error,
+          error: String(e),
         }),
       );
+    }
   }
 
   if (env.N8N_WEBHOOK_SECRET) {

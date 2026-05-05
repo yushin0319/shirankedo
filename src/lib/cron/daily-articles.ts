@@ -1,10 +1,12 @@
+import { getDb } from "../../db/client";
+import { processArticles } from "../api/ingest-articles";
+import { getArticleUrls } from "../api/ingest-articles-read";
 import {
   buildGeminiRequest,
   callGemini,
   notifyObs,
   parseGeminiJson,
   pingHealthchecks,
-  postIngest,
   sanitizeForPrompt,
   stripHtmlTags,
 } from "./cron-shared";
@@ -22,8 +24,8 @@ const ARXIV_URL =
   "http://export.arxiv.org/api/query?search_query=cat:cs.*&sortBy=submittedDate&sortOrder=descending&max_results=30";
 
 export interface DailyArticlesEnv {
+  DB: D1Database;
   GEMINI_API_KEY: string;
-  INGEST_API_KEY: string;
   N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_ARTICLES_ENABLED?: string;
@@ -171,29 +173,23 @@ function findByTitle(list: ArticleItem[], title: string): ArticleItem | null {
 export async function runDailyArticles(env: DailyArticlesEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_ARTICLES_ENABLED !== "true";
+  const db = getDb(env.DB);
 
   console.log(
     JSON.stringify({ type: "daily_articles_start", dry_run: dryRun }),
   );
 
-  // 1. 並列: 既存URL + RSS feeds + ArXiv
+  // 1. 既存URL は D1 直接、RSS / ArXiv は外部 fetch を並列で
   const [existingRes, ...feedResults] = await Promise.allSettled([
-    fetch("https://shirankedo.y-fudo.workers.dev/api/ingest/articles/urls", {
-      headers: { "X-API-Key": env.INGEST_API_KEY },
-    }),
+    getArticleUrls(db),
     ...RSS_SOURCES.map((s) => fetch(s.url)),
     fetch(ARXIV_URL),
   ]);
 
   if (existingRes.status === "rejected")
     throw new Error(`articles/urls: ${String(existingRes.reason)}`);
-  if (!existingRes.value.ok)
-    throw new Error(`articles/urls HTTP ${existingRes.value.status}`);
 
-  const existingData = (await existingRes.value.json()) as { data?: string[] };
-  const existingUrls = new Set(
-    (existingData.data ?? []).map((u) => u.toLowerCase()),
-  );
+  const existingUrls = new Set(existingRes.value.map((u) => u.toLowerCase()));
 
   // 2. RSS パース
   const allRssItems: ArticleItem[] = [];
@@ -528,14 +524,16 @@ JSONのみ出力してください。`;
   if (dryRun) return;
 
   if (apiBody.length > 0) {
-    const postRes = await postIngest("articles", env.INGEST_API_KEY, apiBody);
-    if (!postRes.ok)
+    try {
+      await processArticles(db, apiBody);
+    } catch (e: unknown) {
       console.log(
         JSON.stringify({
           type: "daily_articles_post_failed",
-          error: postRes.error,
+          error: String(e),
         }),
       );
+    }
   }
 
   if (env.N8N_WEBHOOK_SECRET) {
