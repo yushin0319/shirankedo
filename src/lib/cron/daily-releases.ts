@@ -40,11 +40,12 @@ function buildReleaseBatches(
   const valid = repos.filter((r) => r?.includes("/"));
   if (valid.length === 0) return [];
 
-  // batch サイズ 100 (GitHub GraphQL 1 query で 100 リポ × 1 リリース = 100 nodes、
-  // GitHub maxNodeLimit 500,000 内かつ first:1 で cost も 100。BATCH_CRON 全体
-  // (articles+vulns+releases+security 並列) で Cloudflare Workers の subrequest 50
-  // limit を超えないため、できるだけ subreq を圧縮する。)
-  const BATCH_SIZE = 100;
+  // batch サイズ 200 (GitHub GraphQL 1 query で 200 リポ × 1 リリース = 200 nodes、
+  // GitHub maxNodeLimit 500,000 内かつ first:1 で cost も 200。BATCH_CRON 内の
+  // 4 並列 cron が同一 invocation で subrequest 50 limit を共有するため、
+  // release の GraphQL を batch=200 で 22→11 batch に圧縮し、合計 subreq を
+  // 47→36 に減らす。並列実行順で release の obs/hc が後段になっても 50 内に収まる。)
+  const BATCH_SIZE = 200;
   const batches = [];
   for (let i = 0; i < valid.length; i += BATCH_SIZE) {
     const batch = valid.slice(i, i + BATCH_SIZE);
