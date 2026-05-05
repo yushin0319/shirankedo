@@ -158,14 +158,16 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   if (dryRun) return;
 
   // 3. INSERT (D1 直接)
+  let postFailed: string | null = null;
   if (allReleases.length > 0) {
     try {
       await processReleases(db, allReleases);
     } catch (e: unknown) {
+      postFailed = String(e);
       console.log(
         JSON.stringify({
           type: "daily_releases_post_failed",
-          error: String(e),
+          error: postFailed,
         }),
       );
     }
@@ -174,9 +176,11 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   // 4. obs-notify + HC ping
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-releases 完了 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary,
+      severity: postFailed ? "warning" : "info",
+      subject: postFailed
+        ? `❌ shirankedo daily-releases DB書込失敗 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : `✅ shirankedo daily-releases 完了 (${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
     });
     if (!r.ok)
       console.log(
@@ -185,7 +189,12 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   }
 
   if (env.HC_PING_KEY) {
-    const r = await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
+    const r = await pingHealthchecks(
+      env.HC_PING_KEY,
+      HC_SLUG,
+      !postFailed,
+      summary,
+    );
     if (!r.ok)
       console.log(JSON.stringify({ type: "hc_ping_failed", error: r.error }));
   }

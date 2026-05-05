@@ -523,26 +523,31 @@ JSONのみ出力してください。`;
 
   if (dryRun) return;
 
+  let postFailed: string | null = null;
   if (apiBody.length > 0) {
     try {
       await processArticles(db, apiBody);
     } catch (e: unknown) {
+      postFailed = String(e);
       console.log(
         JSON.stringify({
           type: "daily_articles_post_failed",
-          error: String(e),
+          error: postFailed,
         }),
       );
     }
   }
 
   if (env.N8N_WEBHOOK_SECRET) {
+    const ok = !postFailed && !geminiWarning;
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: geminiWarning ? "warning" : "info",
-      subject: geminiWarning
-        ? `⚠️ shirankedo daily-articles 完了(AI処理失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
-        : `✅ shirankedo daily-articles 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary,
+      severity: ok ? "info" : "warning",
+      subject: postFailed
+        ? `❌ shirankedo daily-articles DB書込失敗 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : geminiWarning
+          ? `⚠️ shirankedo daily-articles 完了(AI処理失敗) (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+          : `✅ shirankedo daily-articles 完了 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
     });
     if (!r.ok)
       console.log(
@@ -551,7 +556,12 @@ JSONのみ出力してください。`;
   }
 
   if (env.HC_PING_KEY) {
-    const r = await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
+    const r = await pingHealthchecks(
+      env.HC_PING_KEY,
+      HC_SLUG,
+      !postFailed,
+      summary,
+    );
     if (!r.ok)
       console.log(JSON.stringify({ type: "hc_ping_failed", error: r.error }));
   }

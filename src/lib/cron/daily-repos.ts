@@ -288,6 +288,8 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
   if (dryRun) return;
 
+  const postFailures: string[] = [];
+
   // 5. tracking-repos UPSERT (D1 直接、50件チャンク)
   const CHUNK_SIZE = 50;
   for (let i = 0; i < translations.length; i += CHUNK_SIZE) {
@@ -300,6 +302,9 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     try {
       await processTrackingRepos(db, chunk);
     } catch (e: unknown) {
+      postFailures.push(
+        `tracking-repos chunk ${Math.floor(i / CHUNK_SIZE)}: ${String(e)}`,
+      );
       console.log(
         JSON.stringify({
           type: "daily_repos_post_failed",
@@ -319,6 +324,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     try {
       await processRepoStats(db, statsBody);
     } catch (e: unknown) {
+      postFailures.push(`repo-stats: ${String(e)}`);
       console.log(
         JSON.stringify({
           type: "daily_repos_stats_post_failed",
@@ -328,13 +334,18 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     }
   }
 
+  const postFailed = postFailures.length > 0 ? postFailures.join(" / ") : null;
+
   if (env.N8N_WEBHOOK_SECRET) {
+    const ok = !postFailed && !geminiWarning;
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: geminiWarning ? "warning" : "info",
-      subject: geminiWarning
-        ? `⚠️ shirankedo daily-repos 完了(AI翻訳失敗) (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
-        : `✅ shirankedo daily-repos 完了 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary,
+      severity: ok ? "info" : "warning",
+      subject: postFailed
+        ? `❌ shirankedo daily-repos DB書込失敗 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+        : geminiWarning
+          ? `⚠️ shirankedo daily-repos 完了(AI翻訳失敗) (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
+          : `✅ shirankedo daily-repos 完了 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
     });
     if (!r.ok)
       console.log(
@@ -343,7 +354,12 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
   }
 
   if (env.HC_PING_KEY) {
-    const r = await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
+    const r = await pingHealthchecks(
+      env.HC_PING_KEY,
+      HC_SLUG,
+      !postFailed,
+      summary,
+    );
     if (!r.ok)
       console.log(JSON.stringify({ type: "hc_ping_failed", error: r.error }));
   }
