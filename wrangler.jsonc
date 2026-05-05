@@ -7,12 +7,12 @@
   // Cron Triggers（最大3本）:
   //   [一時テスト] UTC 13:50 = JST 22:50: articles + vulns + security（並列、release は REPOS 側へ移動）
   //   [一時テスト] UTC 13:55 = JST 22:55: stars
-  //   [一時テスト] UTC 14:00 = JST 23:00: repos + release（2 並列）
+  //   [一時テスト] UTC 21:15 = JST 06:15: repos + release（2 並列、release は 400件×6batch Promise.all）
   // PR #137 の cron 修正 (self-fetch → 直接 D1) を本番動作確認するため一時的に
   // 平日昼間に発火させる。確認後に元の深夜 schedule に戻す revert PR を出す。
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["50 13 * * *", "55 13 * * *", "20 19 * * *"]
+    "crons": ["50 13 * * *", "55 13 * * *", "15 21 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
