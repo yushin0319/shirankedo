@@ -3,8 +3,12 @@ import { getTrackingRepos, processReleases } from "../api/ingest-upsert";
 import { notifyObs, pingHealthchecks, sanitizeGitHubName } from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
-const BATCH_INTERVAL_MS = 200;
 const HC_SLUG = "shirankedo-daily-releases";
+// 1 query にまとめると body 過大で GitHub が HTTP 500 を返す (PR #153 で実証済)。
+// 400 件/query × 約6 batch で Promise.all 並列実行 → subreq 消費は ~10 (limit 50)、
+// wall time は GitHub server-side 並列で max 1-2 秒。
+const BATCH_SIZE = 400;
+const MAX_ATTEMPTS = 3;
 
 export interface DailyReleasesEnv {
   DB: D1Database;
@@ -34,24 +38,25 @@ interface ReleaseRow {
   publishedAt: string;
 }
 
-function buildReleaseBatches(
+export function buildReleaseBatches(
   repos: string[],
 ): { query: string; batchIndex: number }[] {
   const valid = repos.filter((r) => r?.includes("/"));
   if (valid.length === 0) return [];
 
-  // 全リポを 1 GraphQL query (alias 並列) にまとめる。
-  // - subrequest 1 のみ消費 (Cloudflare Workers Free Tier の 50 limit 内余裕)
-  // - wall time 1-2 秒で完了 (GitHub が 1 query を server-side 並列処理)
-  // - GraphQL cost = N × first:1 = N (rate limit 5000 / hour 内)
-  // - request body ~150 chars/repo × 2143 = ~320KB (GitHub 1MB 限界内)
-  // 旧実装は 40 件 batch × 53 batch loop で sequential + retry sleep 累積で
-  // CF Workers の wall time 15min に近づき silent kill していた。
-  const parts = valid.map((repo, i) => {
-    const [owner, name] = repo.split("/");
-    return `r${i}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
-  });
-  return [{ query: `{${parts.join(" ")}}`, batchIndex: 0 }];
+  const batches: { query: string; batchIndex: number }[] = [];
+  for (let i = 0; i < valid.length; i += BATCH_SIZE) {
+    const slice = valid.slice(i, i + BATCH_SIZE);
+    const parts = slice.map((repo, j) => {
+      const [owner, name] = repo.split("/");
+      return `r${j}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
+    });
+    batches.push({
+      query: `{${parts.join(" ")}}`,
+      batchIndex: batches.length,
+    });
+  }
+  return batches;
 }
 
 function extractReleases(repoData: RepoResponse, cutoff: string): ReleaseRow[] {
@@ -92,6 +97,68 @@ function extractReleases(repoData: RepoResponse, cutoff: string): ReleaseRow[] {
   return results;
 }
 
+async function fetchBatchWithRetry(
+  env: DailyReleasesEnv,
+  batch: { query: string; batchIndex: number },
+  cutoff: string,
+): Promise<ReleaseRow[]> {
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    res = await fetch(GH_GRAPHQL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        "Content-Type": "application/json",
+        "User-Agent": "shirankedo-daily-releases/1.0",
+      },
+      body: JSON.stringify({ query: batch.query }),
+    });
+    if (res.ok) break;
+    // 5xx は GitHub / Cloudflare 一時的、 retry 価値あり
+    if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+      debugStage(
+        env,
+        `GRAPHQL_RETRY_batch_${batch.batchIndex}`,
+        `HTTP ${res.status} attempt=${attempt}, sleep ${attempt}s`,
+      );
+      await new Promise((r) => setTimeout(r, attempt * 1000));
+      continue;
+    }
+    const body = await res.text().catch(() => "(read fail)");
+    debugStage(
+      env,
+      `GRAPHQL_FAIL_batch_${batch.batchIndex}`,
+      `HTTP ${res.status} (attempt=${attempt}): ${body.substring(0, 300)}`,
+    );
+    throw new Error(
+      `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex} (after ${attempt} attempts)`,
+    );
+  }
+  if (!res) throw new Error("unreachable");
+
+  const json = (await res.json()) as {
+    data?: Record<string, RepoResponse | null>;
+    errors?: { message: string }[];
+  };
+  if (json.errors?.length) {
+    debugStage(
+      env,
+      `GRAPHQL_PARTIAL_ERR_batch_${batch.batchIndex}`,
+      json.errors
+        .slice(0, 3)
+        .map((e) => e.message)
+        .join(" | ")
+        .substring(0, 300),
+    );
+  }
+  const releases: ReleaseRow[] = [];
+  for (const repo of Object.values(json.data ?? {})) {
+    if (!repo?.releases) continue;
+    releases.push(...extractReleases(repo, cutoff));
+  }
+  return releases;
+}
+
 // [DIAGNOSTICS] 真因切り分け用の段階別 fire-and-forget 通知。特定後に削除。
 function debugStage(
   env: DailyReleasesEnv,
@@ -130,72 +197,13 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
 
     const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     const batches = buildReleaseBatches(repos);
-    const allReleases: ReleaseRow[] = [];
     debugStage(env, "BUILT_BATCHES", `${batches.length} batches`);
 
-    // 2. GraphQL バッチ取得 (5xx は retry、 4xx は即 throw)
-    for (let i = 0; i < batches.length; i++) {
-      const batch = batches[i];
-      let res: Response | null = null;
-      const MAX_ATTEMPTS = 3;
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        res = await fetch(GH_GRAPHQL, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-            "Content-Type": "application/json",
-            "User-Agent": "shirankedo-daily-releases/1.0",
-          },
-          body: JSON.stringify({ query: batch.query }),
-        });
-        if (res.ok) break;
-        // 5xx は GitHub 一時的 (Cloudflare 502 等)、 retry 価値あり
-        if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-          debugStage(
-            env,
-            `GRAPHQL_RETRY_batch_${batch.batchIndex}`,
-            `HTTP ${res.status} attempt=${attempt}, sleep ${attempt}s`,
-          );
-          await new Promise((r) => setTimeout(r, attempt * 1000));
-          continue;
-        }
-        // 4xx か 5xx 最終失敗
-        const body = await res.text().catch(() => "(read fail)");
-        debugStage(
-          env,
-          `GRAPHQL_FAIL_batch_${batch.batchIndex}`,
-          `HTTP ${res.status} (attempt=${attempt}): ${body.substring(0, 300)}`,
-        );
-        throw new Error(
-          `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex} (after ${attempt} attempts)`,
-        );
-      }
-      if (!res) throw new Error("unreachable");
-
-      const json = (await res.json()) as {
-        data?: Record<string, RepoResponse | null>;
-        errors?: { message: string }[];
-      };
-      if (json.errors?.length) {
-        debugStage(
-          env,
-          `GRAPHQL_PARTIAL_ERR_batch_${batch.batchIndex}`,
-          json.errors
-            .slice(0, 3)
-            .map((e) => e.message)
-            .join(" | ")
-            .substring(0, 300),
-        );
-      }
-      for (const repo of Object.values(json.data ?? {})) {
-        if (!repo?.releases) continue;
-        allReleases.push(...extractReleases(repo, cutoff));
-      }
-
-      if (i < batches.length - 1) {
-        await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
-      }
-    }
+    // 2. GraphQL バッチ取得を Promise.all で並列実行
+    const batchResults = await Promise.all(
+      batches.map((batch) => fetchBatchWithRetry(env, batch, cutoff)),
+    );
+    const allReleases: ReleaseRow[] = batchResults.flat();
     debugStage(env, "AFTER_GRAPHQL_LOOP", `${allReleases.length} releases`);
     return await finishRun(env, db, allReleases, start, dryRun);
   } catch (e: unknown) {
