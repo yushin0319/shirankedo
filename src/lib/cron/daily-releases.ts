@@ -101,57 +101,118 @@ function extractReleases(repoData: RepoResponse, cutoff: string): ReleaseRow[] {
   return results;
 }
 
+// [DIAGNOSTICS] 真因切り分け用の段階別 fire-and-forget 通知。特定後に削除。
+function debugStage(
+  env: DailyReleasesEnv,
+  stage: string,
+  detail?: string,
+): void {
+  if (!env.N8N_WEBHOOK_SECRET) return;
+  notifyObs(env.N8N_WEBHOOK_SECRET, {
+    severity: "info",
+    subject: `🟡 daily-releases ${stage}`,
+    summary: detail ?? "",
+  }).catch(() => {});
+}
+
 export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
   const start = Date.now();
   const dryRun = env.DAILY_RELEASES_ENABLED !== "true";
   const db = getDb(env.DB);
 
-  // 1. tracking-repos 取得 (D1 直接)
-  const trackingData = await getTrackingRepos(db);
-  const repos = trackingData.map((r) => r.repo);
+  debugStage(env, "START", `dryRun=${dryRun}`);
 
-  console.log(
-    JSON.stringify({
-      type: "daily_releases_start",
-      repo_count: repos.length,
-      dry_run: dryRun,
-    }),
-  );
+  // 全体を try-catch で囲んで、 silent throw を捕捉して詳細通知に乗せる
+  try {
+    // 1. tracking-repos 取得 (D1 直接)
+    const trackingData = await getTrackingRepos(db);
+    const repos = trackingData.map((r) => r.repo);
+    debugStage(env, "GOT_TRACKING_REPOS", `${repos.length} repos`);
 
-  const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-  const batches = buildReleaseBatches(repos);
-  const allReleases: ReleaseRow[] = [];
+    console.log(
+      JSON.stringify({
+        type: "daily_releases_start",
+        repo_count: repos.length,
+        dry_run: dryRun,
+      }),
+    );
 
-  // 2. GraphQL バッチ取得
-  for (let i = 0; i < batches.length; i++) {
-    const batch = batches[i];
-    const res = await fetch(GH_GRAPHQL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        "Content-Type": "application/json",
-        "User-Agent": "shirankedo-daily-releases/1.0",
-      },
-      body: JSON.stringify({ query: batch.query }),
-    });
-    if (!res.ok)
-      throw new Error(
-        `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex}`,
-      );
+    const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const batches = buildReleaseBatches(repos);
+    const allReleases: ReleaseRow[] = [];
+    debugStage(env, "BUILT_BATCHES", `${batches.length} batches`);
 
-    const json = (await res.json()) as {
-      data?: Record<string, RepoResponse | null>;
-    };
-    for (const repo of Object.values(json.data ?? {})) {
-      if (!repo?.releases) continue;
-      allReleases.push(...extractReleases(repo, cutoff));
+    // 2. GraphQL バッチ取得
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const res = await fetch(GH_GRAPHQL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          "Content-Type": "application/json",
+          "User-Agent": "shirankedo-daily-releases/1.0",
+        },
+        body: JSON.stringify({ query: batch.query }),
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "(read fail)");
+        debugStage(
+          env,
+          `GRAPHQL_FAIL_batch_${batch.batchIndex}`,
+          `HTTP ${res.status}: ${body.substring(0, 300)}`,
+        );
+        throw new Error(
+          `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex}`,
+        );
+      }
+
+      const json = (await res.json()) as {
+        data?: Record<string, RepoResponse | null>;
+        errors?: { message: string }[];
+      };
+      if (json.errors?.length) {
+        debugStage(
+          env,
+          `GRAPHQL_PARTIAL_ERR_batch_${batch.batchIndex}`,
+          json.errors
+            .slice(0, 3)
+            .map((e) => e.message)
+            .join(" | ")
+            .substring(0, 300),
+        );
+      }
+      for (const repo of Object.values(json.data ?? {})) {
+        if (!repo?.releases) continue;
+        allReleases.push(...extractReleases(repo, cutoff));
+      }
+
+      if (i < batches.length - 1) {
+        await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
+      }
     }
-
-    if (i < batches.length - 1) {
-      await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
+    debugStage(env, "AFTER_GRAPHQL_LOOP", `${allReleases.length} releases`);
+    return await finishRun(env, db, allReleases, start, dryRun);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    const stack = e instanceof Error ? (e.stack ?? "") : "";
+    if (env.N8N_WEBHOOK_SECRET) {
+      await notifyObs(env.N8N_WEBHOOK_SECRET, {
+        severity: "warning",
+        subject: "❌ shirankedo daily-releases 例外発生",
+        summary: `${msg}\n${stack.substring(0, 1500)}`,
+      });
     }
+    throw e;
   }
+}
 
+async function finishRun(
+  env: DailyReleasesEnv,
+  db: ReturnType<typeof getDb>,
+  allReleases: ReleaseRow[],
+  start: number,
+  dryRun: boolean,
+): Promise<void> {
   const durationMs = Date.now() - start;
   const summary = `daily-releases${dryRun ? " (dry-run)" : ""}: ${allReleases.length}件 / ${(durationMs / 1000).toFixed(1)}s`;
   console.log(
