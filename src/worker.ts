@@ -20,10 +20,10 @@ import {
 } from "./lib/cron/daily-stars";
 import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 
-// UTC 15:00 = JST 00:00: articles + vulns + releases + security（並列）
-const DAILY_BATCH_CRON = "0 15 * * *";
-// UTC 18:30 = JST 03:30: repos
-const DAILY_REPOS_CRON = "30 18 * * *";
+// [一時テスト] UTC 07:50 = JST 16:50: articles + vulns + releases + security（並列）
+const DAILY_BATCH_CRON = "50 7 * * *";
+// [一時テスト] UTC 08:00 = JST 17:00: repos
+const DAILY_REPOS_CRON = "0 8 * * *";
 
 type WorkerEnv = {
   DB: D1Database;
