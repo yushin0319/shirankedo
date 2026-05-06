@@ -23,10 +23,10 @@ import { logCronError } from "./lib/cron/log-cron-error";
 
 // UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
 const DAILY_BATCH_CRON = "0 15 * * *";
-// 5/7 一時検証 2nd: UTC 16:40 = JST 01:40 (BATCH_SIZE 100→50 後の再検証用、
+// 5/7 一時検証 3rd: UTC 23:20 = JST 08:20 (linear sleep 化後の朝再検証、
 // daily-stars と 5 分間隔)。 本番 schedule (UTC 15:10 = JST 00:10) は検証完了
 // 後に revert PR で戻す。
-const DAILY_REPOS_CRON = "40 16 * * *";
+const DAILY_REPOS_CRON = "20 23 * * *";
 
 type WorkerEnv = {
   DB: D1Database;
