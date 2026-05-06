@@ -7,8 +7,10 @@ import { buildStarBatches, type StarBatch } from "./build-star-batches";
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
 // 5xx (GitHub / CF egress proxy 一時障害) を吸収する retry。 daily-releases.ts と
-// 同等の policy。 504 Gateway Timeout で 1 batch 失敗 → cron 全体停止を防ぐ。
-const MAX_ATTEMPTS = 3;
+// 同等の policy。 5/7 検証で本番 cron context で連続 5xx 死亡を確認したため、
+// MAX_ATTEMPTS を 5 に増やし exponential backoff で max 30s 待つ。
+const MAX_ATTEMPTS = 5;
+const RETRY_SLEEP_CAP_MS = 30000;
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /**
@@ -20,9 +22,10 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * UTC 15:05 = JST 00:05 (5分刻みで articles/repos と並べた本番 schedule)。
+ * 5/7 一時検証: UTC 16:15 = JST 01:15 (本番 cron context での連続 5xx 検証用)。
+ * 本番 schedule (UTC 15:05 = JST 00:05) は検証完了後に revert PR で戻す。
  */
-export const DAILY_STARS_CRON = "5 15 * * *";
+export const DAILY_STARS_CRON = "15 16 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
@@ -77,16 +80,17 @@ export async function fetchBatch(
     if (res.ok) break;
     // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+      const sleepMs = Math.min(attempt * attempt * 1000, RETRY_SLEEP_CAP_MS);
       console.log(
         JSON.stringify({
           type: "graphql_retry",
           batch: batch.batchIndex,
           status: res.status,
           attempt,
-          sleep_ms: attempt * 1000,
+          sleep_ms: sleepMs,
         }),
       );
-      await new Promise((r) => setTimeout(r, attempt * 1000));
+      await new Promise((r) => setTimeout(r, sleepMs));
       continue;
     }
     throw new Error(
@@ -236,6 +240,37 @@ export async function applyRenames(
   return { applied, skipped, errors };
 }
 
+/**
+ * GraphQL POST 前に軽量な GET /zen を 1 回叩いて egress 経路をウォームアップ。
+ * 5/7 cron context での連続 5xx 切り分け用。 失敗時も本処理に進む (catch 握り潰し)。
+ */
+async function warmUpEgress(env: DailyStarsEnv): Promise<void> {
+  const t0 = Date.now();
+  try {
+    const res = await fetch("https://api.github.com/zen", {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        "User-Agent": "shirankedo-daily-stars/warmup",
+      },
+    });
+    console.log(
+      JSON.stringify({
+        type: "warmup_done",
+        status: res.status,
+        duration_ms: Date.now() - t0,
+      }),
+    );
+  } catch (e) {
+    console.log(
+      JSON.stringify({
+        type: "warmup_fail",
+        error: String(e),
+        duration_ms: Date.now() - t0,
+      }),
+    );
+  }
+}
+
 /** Cron Trigger 本体: tracking_repos → GraphQL star fetch → repo_stats bulk INSERT */
 export async function runDailyStars(env: DailyStarsEnv): Promise<{
   inserted: number;
@@ -248,6 +283,10 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
   const start = Date.now();
   const dryRun = env.DAILY_STARS_ENABLED !== "true";
   const db = getDb(env.DB);
+
+  // 0. warm-up fetch: 5/7 検証 — cron context での最初の egress fetch が CF
+  //    proxy に弾かれる仮説の対策。 GET /zen は軽量、 失敗しても本処理に進む。
+  await warmUpEgress(env);
 
   // 1. tracking_repos 取得
   const repos = await queryD1("daily_stars.tracking_repos.select", () =>
