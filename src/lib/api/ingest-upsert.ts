@@ -16,12 +16,13 @@ import {
   vulnerabilitySchema,
 } from "./schemas";
 
-// D1 は 1 prepared statement あたり最大 100 bound parameter。
-// SQLite は 1 statement あたり最大 999 個の bind 変数。 各テーブル INSERT 列数
-// (5 列前後) × 100 行 = 500 params で安全。chunk を大きくすることで CF Workers
-// Free の subrequest 上限 50 に対する D1 query 数を大幅削減 (旧 20 → 100 で
-// 5 倍効率、release 40 件なら 1 chunk = 1 subreq)。
-const INSERT_CHUNK_SIZE = 100;
+// D1 は 1 prepared statement あたり最大 100 bound parameter。 各テーブル INSERT
+// 列数は releases/trackingRepos が 6、 vulnerabilities が 5。 50 件 × 6 列 = 300
+// は超過するが、 実測で vulnerabilities 70 件 × 5 = 350 は通過、 releases 72
+// 件 × 6 = 432 で失敗 (PR #155 03:20 UTC) → 限界は ~350-432 の間。 16 件以下なら
+// 16 × 6 = 96 < 100 で確実に safe。 daily 実 INSERT は最大 100 件程度なので
+// chunk 数 7 でも subrequest 50 limit 内余裕。
+const INSERT_CHUNK_SIZE = 16;
 
 /** vulnerabilities: UPSERT（cvssScore 更新あり） */
 export async function processVulnerabilities(
