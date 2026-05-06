@@ -19,6 +19,7 @@ import {
   runDailyStars,
 } from "./lib/cron/daily-stars";
 import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
+import { logCronError } from "./lib/cron/log-cron-error";
 
 // UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
 const DAILY_BATCH_CRON = "0 15 * * *";
@@ -55,17 +56,6 @@ interface WorkerHandler {
   ): Promise<void>;
 }
 
-function logCronError(name: string, e: unknown): void {
-  console.log(
-    JSON.stringify({
-      type: "cron_failed",
-      cron: name,
-      error: String(e),
-      stack: e instanceof Error ? e.stack : undefined,
-    }),
-  );
-}
-
 export default {
   async fetch(request, env, ctx) {
     return handle(request, env, ctx);
@@ -75,7 +65,7 @@ export default {
       case DAILY_STARS_CRON: {
         ctx.waitUntil(
           runDailyStars(env).catch(async (e) => {
-            logCronError("daily-stars", e);
+            logCronError("daily-stars", e, env, ctx);
             if (env.HC_PING_KEY) {
               const r = await pingHcStars(env.HC_PING_KEY, false, String(e));
               if (!r.ok) {
@@ -99,13 +89,13 @@ export default {
         ctx.waitUntil(
           Promise.allSettled([
             runDailyArticles(env).catch((e) => {
-              logCronError("daily-articles", e);
+              logCronError("daily-articles", e, env, ctx);
             }),
             runDailyVulns(env).catch((e) => {
-              logCronError("daily-vulns", e);
+              logCronError("daily-vulns", e, env, ctx);
             }),
             runDailySecurity(env).catch((e) => {
-              logCronError("daily-security", e);
+              logCronError("daily-security", e, env, ctx);
             }),
           ]).then((results) => {
             const failed = results.filter((r) => r.status === "rejected");
@@ -128,10 +118,10 @@ export default {
         ctx.waitUntil(
           Promise.allSettled([
             runDailyRepos(env).catch((e) => {
-              logCronError("daily-repos", e);
+              logCronError("daily-repos", e, env, ctx);
             }),
             runDailyReleases(env).catch((e) => {
-              logCronError("daily-releases", e);
+              logCronError("daily-releases", e, env, ctx);
             }),
           ]),
         );
