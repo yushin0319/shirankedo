@@ -6,6 +6,9 @@ import { buildStarBatches, type StarBatch } from "./build-star-batches";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
+// 5xx (GitHub / CF egress proxy 一時障害) を吸収する retry。 daily-releases.ts と
+// 同等の policy。 504 Gateway Timeout で 1 batch 失敗 → cron 全体停止を防ぐ。
+const MAX_ATTEMPTS = 3;
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /**
@@ -56,24 +59,41 @@ interface BatchResult {
   renames: RenameRow[];
 }
 
-async function fetchBatch(
+export async function fetchBatch(
   batch: StarBatch,
   token: string,
 ): Promise<BatchResult> {
-  const res = await fetch(GH_GRAPHQL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "User-Agent": "shirankedo-daily-stars/1.0",
-    },
-    body: JSON.stringify({ query: batch.query }),
-  });
-  if (!res.ok) {
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    res = await fetch(GH_GRAPHQL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "shirankedo-daily-stars/1.0",
+      },
+      body: JSON.stringify({ query: batch.query }),
+    });
+    if (res.ok) break;
+    // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり
+    if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+      console.log(
+        JSON.stringify({
+          type: "graphql_retry",
+          batch: batch.batchIndex,
+          status: res.status,
+          attempt,
+          sleep_ms: attempt * 1000,
+        }),
+      );
+      await new Promise((r) => setTimeout(r, attempt * 1000));
+      continue;
+    }
     throw new Error(
-      `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex}`,
+      `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex} (after ${attempt} attempts)`,
     );
   }
+  if (!res) throw new Error("unreachable");
   const json = (await res.json()) as {
     data?: Record<
       string,
