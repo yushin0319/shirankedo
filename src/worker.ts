@@ -22,8 +22,8 @@ import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 
 // [一時テスト] UTC 13:50 = JST 22:50: articles + vulns + security（並列）
 const DAILY_BATCH_CRON = "50 13 * * *";
-// [一時テスト] UTC 03:20 = JST 12:20: repos + release（release は 100件×22batch sequential）
-const DAILY_REPOS_CRON = "20 3 * * *";
+// [一時テスト] UTC 04:05 = JST 13:05: repos + release（INSERT_CHUNK 16 で D1 100param 制限回避）
+const DAILY_REPOS_CRON = "5 4 * * *";
 
 type WorkerEnv = {
   DB: D1Database;
