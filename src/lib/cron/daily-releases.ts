@@ -4,10 +4,15 @@ import { notifyObs, pingHealthchecks, sanitizeGitHubName } from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const HC_SLUG = "shirankedo-daily-releases";
-// 1 query にまとめると body 過大で GitHub が HTTP 500 を返す (PR #153 で実証済)。
-// 400 件/query × 約6 batch で Promise.all 並列実行 → subreq 消費は ~10 (limit 50)、
-// wall time は GitHub server-side 並列で max 1-2 秒。
-const BATCH_SIZE = 400;
+// 検証履歴:
+// - PR #153 (1 query × 2143 alias): GitHub HTTP 500 (body 過大)
+// - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502 "error code: 502"
+//   → CF Workers から api.github.com/graphql への並列 fetch を CF egress proxy が弾く
+// 結論: n8n parity の sequential が最も確実。 100/batch × 22 batch sequential。
+// - subreq 22 + obs/hc = ~25 (Free Tier 50 limit 内)
+// - wall time 約 1.5s × 22 = ~33s (CPU 15min 上限内余裕)
+const BATCH_SIZE = 100;
+const BATCH_INTERVAL_MS = 200;
 const MAX_ATTEMPTS = 3;
 
 export interface DailyReleasesEnv {
@@ -199,11 +204,15 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
     const batches = buildReleaseBatches(repos);
     debugStage(env, "BUILT_BATCHES", `${batches.length} batches`);
 
-    // 2. GraphQL バッチ取得を Promise.all で並列実行
-    const batchResults = await Promise.all(
-      batches.map((batch) => fetchBatchWithRetry(env, batch, cutoff)),
-    );
-    const allReleases: ReleaseRow[] = batchResults.flat();
+    // 2. GraphQL バッチ取得を sequential 実行 (n8n parity)
+    const allReleases: ReleaseRow[] = [];
+    for (let i = 0; i < batches.length; i++) {
+      const rows = await fetchBatchWithRetry(env, batches[i], cutoff);
+      allReleases.push(...rows);
+      if (i < batches.length - 1) {
+        await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
+      }
+    }
     debugStage(env, "AFTER_GRAPHQL_LOOP", `${allReleases.length} releases`);
     return await finishRun(env, db, allReleases, start, dryRun);
   } catch (e: unknown) {
