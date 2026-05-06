@@ -13,7 +13,11 @@ const HC_SLUG = "shirankedo-daily-releases";
 // - wall time 約 1.5s × 22 = ~33s (CPU 15min 上限内余裕)
 const BATCH_SIZE = 100;
 const BATCH_INTERVAL_MS = 200;
-const MAX_ATTEMPTS = 3;
+// 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
+// query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
+// 増やしつつ exponential backoff で長めに待つ。 max sleep 30s × MAX_ATTEMPTS-1。
+const MAX_ATTEMPTS = 5;
+const RETRY_SLEEP_CAP_MS = 30000;
 
 export interface DailyReleasesEnv {
   DB: D1Database;
@@ -121,12 +125,13 @@ async function fetchBatchWithRetry(
     if (res.ok) break;
     // 5xx は GitHub / Cloudflare 一時的、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+      const sleepMs = Math.min(attempt * attempt * 1000, RETRY_SLEEP_CAP_MS);
       debugStage(
         env,
         `GRAPHQL_RETRY_batch_${batch.batchIndex}`,
-        `HTTP ${res.status} attempt=${attempt}, sleep ${attempt}s`,
+        `HTTP ${res.status} attempt=${attempt}, sleep ${sleepMs}ms`,
       );
-      await new Promise((r) => setTimeout(r, attempt * 1000));
+      await new Promise((r) => setTimeout(r, sleepMs));
       continue;
     }
     const body = await res.text().catch(() => "(read fail)");
@@ -164,6 +169,29 @@ async function fetchBatchWithRetry(
   return releases;
 }
 
+/**
+ * GraphQL POST 前に軽量な GET /zen を 1 回叩いて egress 経路をウォームアップする。
+ * 5/7 の cron context での連続 5xx 切り分け用。 失敗しても呼び出し元は本処理に
+ * 進む (catch して握り潰す)。 成否を debugStage で観測性 DB に記録。
+ */
+async function warmUpEgress(
+  env: DailyReleasesEnv,
+  cronLabel: string,
+): Promise<void> {
+  const t0 = Date.now();
+  try {
+    const res = await fetch("https://api.github.com/zen", {
+      headers: {
+        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+        "User-Agent": `shirankedo-${cronLabel}/warmup`,
+      },
+    });
+    debugStage(env, "WARMUP_DONE", `status=${res.status} ${Date.now() - t0}ms`);
+  } catch (e) {
+    debugStage(env, "WARMUP_FAIL", `${String(e)} ${Date.now() - t0}ms`);
+  }
+}
+
 // [DIAGNOSTICS] 真因切り分け用の段階別 fire-and-forget 通知。特定後に削除。
 function debugStage(
   env: DailyReleasesEnv,
@@ -187,6 +215,10 @@ export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
 
   // 全体を try-catch で囲んで、 silent throw を捕捉して詳細通知に乗せる
   try {
+    // 0. warm-up fetch: cron context での最初の egress fetch が CF proxy に弾か
+    //    れる仮説の対策。 GET /zen は軽量 endpoint で、 失敗しても本処理に進む。
+    await warmUpEgress(env, "daily-releases");
+
     // 1. tracking-repos 取得 (D1 直接)
     const trackingData = await getTrackingRepos(db);
     const repos = trackingData.map((r) => r.repo);

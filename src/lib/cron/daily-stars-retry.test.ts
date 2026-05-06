@@ -47,11 +47,14 @@ describe("fetchBatch retry", () => {
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("server error", { status: 502 }));
 
-    await expect(fetchBatch(dummyBatch, "TOKEN")).rejects.toThrow(
-      /GitHub GraphQL HTTP 502 batch=0 \(after 3 attempts\)/,
+    const promise = fetchBatch(dummyBatch, "TOKEN");
+    // exponential backoff (1+4+9+16=30s) を fake timer で advance
+    await vi.advanceTimersByTimeAsync(35000);
+    await expect(promise).rejects.toThrow(
+      /GitHub GraphQL HTTP 502 batch=0 \(after 5 attempts\)/,
     );
-    expect(fetchSpy).toHaveBeenCalledTimes(3);
-  });
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+  }, 60000);
 
   it("4xx は retry せず即 throw", async () => {
     const fetchSpy = vi
