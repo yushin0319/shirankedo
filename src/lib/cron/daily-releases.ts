@@ -129,7 +129,10 @@ async function fetchBatchWithRetry(
     if (res.ok) break;
     // 5xx は GitHub / Cloudflare 一時的、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-      const sleepMs = Math.min(attempt * attempt * 1000, RETRY_SLEEP_CAP_MS);
+      // 5/7 検証 3rd: exponential (1+4+9+16=30s) は失敗 batch が複数あると
+      // sleep 累計で Worker wall time を圧迫し silent kill される。 linear に
+      // 戻して累計 1+2+3+4=10s に抑える。 MAX_ATTEMPTS=5 は 504 吸収のため維持。
+      const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
       debugStage(
         env,
         `GRAPHQL_RETRY_batch_${batch.batchIndex}`,

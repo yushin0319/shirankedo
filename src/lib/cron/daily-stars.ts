@@ -22,10 +22,10 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * 5/7 一時検証 2nd: UTC 16:35 = JST 01:35 (BATCH_SIZE 100→50 後の再検証用)。
+ * 5/7 一時検証 3rd: UTC 23:15 = JST 08:15 (linear sleep 化後の朝再検証)。
  * 本番 schedule (UTC 15:05 = JST 00:05) は検証完了後に revert PR で戻す。
  */
-export const DAILY_STARS_CRON = "35 16 * * *";
+export const DAILY_STARS_CRON = "15 23 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
@@ -80,7 +80,9 @@ export async function fetchBatch(
     if (res.ok) break;
     // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-      const sleepMs = Math.min(attempt * attempt * 1000, RETRY_SLEEP_CAP_MS);
+      // 5/7 検証 3rd: exponential は wall time 圧迫で silent kill 原因。
+      // linear (累計 10s) に戻す。 MAX_ATTEMPTS=5 は 504 吸収のため維持。
+      const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
       console.log(
         JSON.stringify({
           type: "graphql_retry",
