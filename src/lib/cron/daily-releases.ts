@@ -6,16 +6,16 @@ const GH_GRAPHQL = "https://api.github.com/graphql";
 const HC_SLUG = "shirankedo-daily-releases";
 // 検証履歴:
 // - PR #153 (1 query × 2143 alias): GitHub HTTP 500 (body 過大)
-// - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502 "error code: 502"
-//   → CF Workers から api.github.com/graphql への並列 fetch を CF egress proxy が弾く
+// - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502
 // - PR #155 (sequential × 22 batch × 100 alias): 213s 完走 (5/6 04:00 時点)
-// - 5/7 00:10 / 01:20 JST: 同 sequential 100 alias で batch=0 が連続 504。
-//   ローカル curl は同 query 7s/200 OK のため GitHub 側は捌ける = CF Worker
-//   fetch の timeout に応答が間に合わない仮説。 PR (本 PR): 100 → 50 に半減し
-//   query body サイズと GitHub 側処理時間を削って timeout 回避を狙う。
-// - 50/batch × 44 batch sequential、 subreq 44 + warmup 1 + obs/hc = ~50 で
-//   Free 50 Tier 上限ギリギリ。
-const BATCH_SIZE = 50;
+// - 5/7 00:10 JST: sequential 100 alias で batch=0 連続 504
+// - 5/7 01:40 JST (PR #162 BATCH_SIZE 50): batch 10/11/13/17 で 504 + sleep
+//   exponential 累計で wall time 圧迫 → silent kill
+// - 5/7 08:20 JST (PR #163 sleep linear): 504 ゼロ、 batch 12/13 PARTIAL_ERR
+//   後 silent kill。 fetch 自体の hung が wall time を圧迫している疑い
+// - 本 PR: BATCH_SIZE 20 (110 batch、 query body ~4KB) + fetch に
+//   AbortSignal.timeout(10000) で hung を打ち切り即 retry に流す
+const BATCH_SIZE = 20;
 const BATCH_INTERVAL_MS = 200;
 // 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
 // query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
@@ -117,15 +117,35 @@ async function fetchBatchWithRetry(
 ): Promise<ReleaseRow[]> {
   let res: Response | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    res = await fetch(GH_GRAPHQL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        "Content-Type": "application/json",
-        "User-Agent": "shirankedo-daily-releases/1.0",
-      },
-      body: JSON.stringify({ query: batch.query }),
-    });
+    // 5/7 検証 4th: 特定 batch で fetch が hung し wall time を圧迫する疑い
+    // (silent kill 再発)。 10s で abort して即 retry に流す。
+    try {
+      res = await fetch(GH_GRAPHQL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          "Content-Type": "application/json",
+          "User-Agent": "shirankedo-daily-releases/1.0",
+        },
+        body: JSON.stringify({ query: batch.query }),
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (e) {
+      // AbortError or network error → retry
+      if (attempt < MAX_ATTEMPTS) {
+        const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
+        debugStage(
+          env,
+          `GRAPHQL_TIMEOUT_batch_${batch.batchIndex}`,
+          `${String(e).substring(0, 100)} attempt=${attempt}, sleep ${sleepMs}ms`,
+        );
+        await new Promise((r) => setTimeout(r, sleepMs));
+        continue;
+      }
+      throw new Error(
+        `GitHub GraphQL fetch failed batch=${batch.batchIndex} (after ${attempt} attempts): ${String(e).substring(0, 200)}`,
+      );
+    }
     if (res.ok) break;
     // 5xx は GitHub / Cloudflare 一時的、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {

@@ -22,10 +22,10 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * 5/7 一時検証 3rd: UTC 23:15 = JST 08:15 (linear sleep 化後の朝再検証)。
+ * 5/7 一時検証 4th: UTC 23:45 = JST 08:45 (BATCH 20 + fetch timeout 10s 後)。
  * 本番 schedule (UTC 15:05 = JST 00:05) は検証完了後に revert PR で戻す。
  */
-export const DAILY_STARS_CRON = "15 23 * * *";
+export const DAILY_STARS_CRON = "45 23 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
@@ -68,15 +68,37 @@ export async function fetchBatch(
 ): Promise<BatchResult> {
   let res: Response | null = null;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    res = await fetch(GH_GRAPHQL, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        "User-Agent": "shirankedo-daily-stars/1.0",
-      },
-      body: JSON.stringify({ query: batch.query }),
-    });
+    // 5/7 検証 4th: fetch hung 対策で 10s timeout
+    try {
+      res = await fetch(GH_GRAPHQL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "User-Agent": "shirankedo-daily-stars/1.0",
+        },
+        body: JSON.stringify({ query: batch.query }),
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (e) {
+      if (attempt < MAX_ATTEMPTS) {
+        const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
+        console.log(
+          JSON.stringify({
+            type: "graphql_timeout",
+            batch: batch.batchIndex,
+            error: String(e).substring(0, 100),
+            attempt,
+            sleep_ms: sleepMs,
+          }),
+        );
+        await new Promise((r) => setTimeout(r, sleepMs));
+        continue;
+      }
+      throw new Error(
+        `GitHub GraphQL fetch failed batch=${batch.batchIndex} (after ${attempt} attempts): ${String(e).substring(0, 200)}`,
+      );
+    }
     if (res.ok) break;
     // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり
     if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
