@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { getDb } from "../../db/client";
 import { repoStats, trackingRepos } from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
@@ -153,10 +154,74 @@ export async function pingHealthchecks(
   return safeFetch(url, { method: "POST", body: body ?? "" });
 }
 
+/**
+ * GitHub の rename 検出結果を tracking_repos に反映する。
+ *
+ * 設計判断 (#net-task: rename 反映):
+ * - tracking_repos のみ UPDATE。repo_stats / releases は旧名で履歴を残す
+ *   （次回 cron 以降は新名で蓄積される）。
+ * - UNIQUE 制約衝突 (新名 row が既存) なら旧名を DELETE（孤児）。GitHub 側で
+ *   既に新名 repository が存在するケース。
+ * - dry-run 時は何もせず skipped 扱い。
+ *
+ * 戻り値の applied / skipped は obs-notify summary に反映して履歴を残す。
+ */
+export async function applyRenames(
+  db: ReturnType<typeof getDb>,
+  renames: RenameRow[],
+  dryRun: boolean,
+): Promise<{ applied: number; skipped: number; errors: number }> {
+  if (dryRun || renames.length === 0) {
+    return { applied: 0, skipped: renames.length, errors: 0 };
+  }
+
+  let applied = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const { from, to } of renames) {
+    if (from === to) {
+      skipped++;
+      continue;
+    }
+    try {
+      const existing = await db
+        .select({ repo: trackingRepos.repo })
+        .from(trackingRepos)
+        .where(eq(trackingRepos.repo, to))
+        .limit(1);
+      if (existing.length > 0) {
+        // 新名 row が既存 → 旧名 row を孤児として削除
+        await db.delete(trackingRepos).where(eq(trackingRepos.repo, from));
+      } else {
+        await db
+          .update(trackingRepos)
+          .set({ repo: to })
+          .where(eq(trackingRepos.repo, from));
+      }
+      applied++;
+    } catch (e) {
+      errors++;
+      console.log(
+        JSON.stringify({
+          type: "daily_stars_rename_failed",
+          from,
+          to,
+          error: String(e),
+        }),
+      );
+    }
+  }
+
+  return { applied, skipped, errors };
+}
+
 /** Cron Trigger 本体: tracking_repos → GraphQL star fetch → repo_stats bulk INSERT */
 export async function runDailyStars(env: DailyStarsEnv): Promise<{
   inserted: number;
   renamed: number;
+  renamesApplied: number;
+  renamesSkipped: number;
   durationMs: number;
   dryRun: boolean;
 }> {
@@ -215,14 +280,23 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }
   }
 
+  // 4.5. rename 適用（tracking_repos のみ UPDATE。repo_stats / releases は履歴保持）
+  const renameResult = await queryD1(
+    "daily_stars.tracking_repos.rename_apply",
+    () => applyRenames(db, allRenames, dryRun),
+  );
+
   const durationMs = Date.now() - start;
-  const summary = `daily-stars${dryRun ? " (dry-run)" : ""}: ${allStars.length} stars / ${allRenames.length} renames / ${(durationMs / 1000).toFixed(1)}s`;
+  const summary = `daily-stars${dryRun ? " (dry-run)" : ""}: ${allStars.length} stars / ${allRenames.length} renames (applied=${renameResult.applied} skipped=${renameResult.skipped} errors=${renameResult.errors}) / ${(durationMs / 1000).toFixed(1)}s`;
   console.log(
     JSON.stringify({
       type: "daily_stars_done",
       fetched: allStars.length,
       inserted,
       renamed: allRenames.length,
+      renames_applied: renameResult.applied,
+      renames_skipped: renameResult.skipped,
+      renames_errors: renameResult.errors,
       duration_ms: durationMs,
       dry_run: dryRun,
     }),
@@ -233,7 +307,7 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     let summaryText = summary;
     if (allRenames.length) {
       const lines = allRenames.slice(0, 10).map((r) => `- ${r.from} → ${r.to}`);
-      summaryText += `\nリネーム検知:\n${lines.join("\n")}`;
+      summaryText += `\nリネーム検知 (適用 ${renameResult.applied} / 失敗 ${renameResult.errors}):\n${lines.join("\n")}`;
     }
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
       severity: "info",
@@ -258,6 +332,8 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
   return {
     inserted,
     renamed: allRenames.length,
+    renamesApplied: renameResult.applied,
+    renamesSkipped: renameResult.skipped,
     durationMs,
     dryRun,
   };
