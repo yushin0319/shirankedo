@@ -20,10 +20,10 @@ import {
 } from "./lib/cron/daily-stars";
 import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 
-// [一時テスト] UTC 13:50 = JST 22:50: articles + vulns + security（並列）
-const DAILY_BATCH_CRON = "50 13 * * *";
-// [一時テスト] UTC 04:05 = JST 13:05: repos + release（INSERT_CHUNK 16 で D1 100param 制限回避）
-const DAILY_REPOS_CRON = "5 4 * * *";
+// UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
+const DAILY_BATCH_CRON = "0 15 * * *";
+// UTC 15:10 = JST 00:10: repos + release（release は sequential 100/batch + INSERT_CHUNK 16）
+const DAILY_REPOS_CRON = "10 15 * * *";
 
 type WorkerEnv = {
   DB: D1Database;

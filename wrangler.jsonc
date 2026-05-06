@@ -4,15 +4,14 @@
   "compatibility_flags": ["nodejs_compat"],
   // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
   "main": "src/worker.ts",
-  // Cron Triggers（最大3本）:
-  //   [一時テスト] UTC 13:50 = JST 22:50: articles + vulns + security（並列、release は REPOS 側へ移動）
-  //   [一時テスト] UTC 13:55 = JST 22:55: stars
-  //   [一時テスト] UTC 04:05 = JST 13:05: repos + release（INSERT_CHUNK 16 で D1 100param 制限回避）
-  // PR #137 の cron 修正 (self-fetch → 直接 D1) を本番動作確認するため一時的に
-  // 平日昼間に発火させる。確認後に元の深夜 schedule に戻す revert PR を出す。
+  // Cron Triggers（最大3本、 5分刻みで深夜 00:00-00:10 JST 帯に集約）:
+  //   UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
+  //   UTC 15:05 = JST 00:05: stars
+  //   UTC 15:10 = JST 00:10: repos + release（release は ~3分かかる）
+  // n8n cron は 月曜 03:00-03:15 が混雑帯のため、それを避けて 00 時台に配置。
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["50 13 * * *", "55 13 * * *", "5 4 * * *"]
+    "crons": ["0 15 * * *", "5 15 * * *", "10 15 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
