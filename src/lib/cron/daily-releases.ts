@@ -8,10 +8,14 @@ const HC_SLUG = "shirankedo-daily-releases";
 // - PR #153 (1 query × 2143 alias): GitHub HTTP 500 (body 過大)
 // - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502 "error code: 502"
 //   → CF Workers から api.github.com/graphql への並列 fetch を CF egress proxy が弾く
-// 結論: n8n parity の sequential が最も確実。 100/batch × 22 batch sequential。
-// - subreq 22 + obs/hc = ~25 (Free Tier 50 limit 内)
-// - wall time 約 1.5s × 22 = ~33s (CPU 15min 上限内余裕)
-const BATCH_SIZE = 100;
+// - PR #155 (sequential × 22 batch × 100 alias): 213s 完走 (5/6 04:00 時点)
+// - 5/7 00:10 / 01:20 JST: 同 sequential 100 alias で batch=0 が連続 504。
+//   ローカル curl は同 query 7s/200 OK のため GitHub 側は捌ける = CF Worker
+//   fetch の timeout に応答が間に合わない仮説。 PR (本 PR): 100 → 50 に半減し
+//   query body サイズと GitHub 側処理時間を削って timeout 回避を狙う。
+// - 50/batch × 44 batch sequential、 subreq 44 + warmup 1 + obs/hc = ~50 で
+//   Free 50 Tier 上限ギリギリ。
+const BATCH_SIZE = 50;
 const BATCH_INTERVAL_MS = 200;
 // 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
 // query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
