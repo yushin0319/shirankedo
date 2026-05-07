@@ -4,15 +4,14 @@
   "compatibility_flags": ["nodejs_compat"],
   // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
   "main": "src/worker.ts",
-  // Cron Triggers（最大3本）:
+  // Cron Triggers（最大3本、 5分刻みで深夜 00:00-00:10 JST 帯に集約）:
   //   UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
-  //   UTC 17:35 = JST 02:35: stars        ← 5/8 一時検証 11th (本番は UTC 15:05)
-  //   UTC 17:45 = JST 02:45: repos+release ← 5/8 一時検証 11th (本番は UTC 15:10)
-  //   stars と repos+release は 10 min gap で overlap 回避。
-  // 検証完了後に revert PR で本番 schedule (深夜 00:00-00:10 JST 帯) に戻す。
+  //   UTC 15:05 = JST 00:05: stars
+  //   UTC 15:10 = JST 00:10: repos + release（release は DAILY_RELEASES_ENABLED
+  //                                            =false で一時停止）
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["0 15 * * *", "35 17 * * *", "45 17 * * *"]
+    "crons": ["0 15 * * *", "5 15 * * *", "10 15 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
@@ -27,7 +26,9 @@
   "vars": {
     "DAILY_ARTICLES_ENABLED": "true",
     "DAILY_VULNS_ENABLED": "true",
-    "DAILY_RELEASES_ENABLED": "true",
+    // 5/8 一時停止: CF Workers cron で 12 PR (#160-172) 試行も release のみ
+    // wall time 圧迫で silent kill。 翌日 案 D (n8n WF 復活) で再開予定。
+    "DAILY_RELEASES_ENABLED": "false",
     "DAILY_SECURITY_ENABLED": "true",
     "DAILY_REPOS_ENABLED": "true"
   },
