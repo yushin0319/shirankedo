@@ -132,7 +132,7 @@ async function fetchBatchWithRetry(
           "User-Agent": "shirankedo-daily-releases/1.0",
         },
         body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(5000),
       });
     } catch (e) {
       // AbortError or network error → retry
