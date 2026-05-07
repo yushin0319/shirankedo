@@ -9,13 +9,16 @@ const HC_SLUG = "shirankedo-daily-releases";
 // - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502
 // - PR #155 (sequential × 22 batch × 100 alias): 213s 完走 (5/6 04:00 時点)
 // - 5/7 00:10 JST: sequential 100 alias で batch=0 連続 504
-// - 5/7 01:40 JST (PR #162 BATCH_SIZE 50): batch 10/11/13/17 で 504 + sleep
-//   exponential 累計で wall time 圧迫 → silent kill
-// - 5/7 08:20 JST (PR #163 sleep linear): 504 ゼロ、 batch 12/13 PARTIAL_ERR
-//   後 silent kill。 fetch 自体の hung が wall time を圧迫している疑い
-// - 本 PR: BATCH_SIZE 20 (110 batch、 query body ~4KB) + fetch に
-//   AbortSignal.timeout(10000) で hung を打ち切り即 retry に流す
-const BATCH_SIZE = 20;
+// - 5/7 01:40 JST (PR #162 BATCH 50, exponential): batch 10/11/13/17 504
+//   sleep 累計 wall time 圧迫 → silent kill
+// - 5/7 08:20 JST (PR #163 sleep linear): 504 ゼロ、 batch 12/13 後 silent kill
+// - 5/7 08:50 JST (PR #164 BATCH 20 + timeout 10s): batch 30 後 silent kill
+// - 共通点: subrequest 累積 (warmup + obs notify + batch fetch + d1) が
+//   50 上限 (Free/Bundled tier) に達している疑い。 BATCH_SIZE を逆に大きく
+//   して batch 数を 11 以下に圧縮し subreq 上限超過を回避する。
+// - 本 PR: BATCH_SIZE 200 sequential (~11 batch、 query body ~38KB) +
+//   AbortSignal.timeout(30000) で重い query 対応
+const BATCH_SIZE = 200;
 const BATCH_INTERVAL_MS = 200;
 // 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
 // query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
@@ -128,7 +131,7 @@ async function fetchBatchWithRetry(
           "User-Agent": "shirankedo-daily-releases/1.0",
         },
         body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(30000),
       });
     } catch (e) {
       // AbortError or network error → retry
