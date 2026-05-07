@@ -23,9 +23,9 @@ import { logCronError } from "./lib/cron/log-cron-error";
 
 // UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
 const DAILY_BATCH_CRON = "0 15 * * *";
-// 5/7 一時検証 5th: UTC 00:20 = JST 09:20 (BATCH_SIZE 200 + fetch timeout 30s
-// 後、 daily-stars と 5 分間隔)。 本番 (UTC 15:10) は検証完了後 revert。
-const DAILY_REPOS_CRON = "20 0 * * *";
+// 5/7 一時検証 6th: UTC 00:50 = JST 09:50 (BATCH_SIZE 100 sweet spot 復帰、
+// daily-stars と 5 分間隔)。 本番 (UTC 15:10) は検証完了後 revert。
+const DAILY_REPOS_CRON = "50 0 * * *";
 
 type WorkerEnv = {
   DB: D1Database;
