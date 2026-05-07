@@ -22,10 +22,10 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * 5/8 一時検証 9th: UTC 16:25 = JST 01:25 (timeout 5s + 10min gap)。
+ * 5/8 一時検証 10th: UTC 16:55 = JST 01:55 (timeout 10s 中庸値)。
  * 本番 schedule (UTC 15:05 = JST 00:05) は検証完了後に revert PR で戻す。
  */
-export const DAILY_STARS_CRON = "25 16 * * *";
+export const DAILY_STARS_CRON = "55 16 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
@@ -78,7 +78,7 @@ export async function fetchBatch(
           "User-Agent": "shirankedo-daily-stars/1.0",
         },
         body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(10000),
       });
     } catch (e) {
       if (attempt < MAX_ATTEMPTS) {
