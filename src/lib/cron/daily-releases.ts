@@ -236,18 +236,25 @@ async function warmUpEgress(
   }
 }
 
-// [DIAGNOSTICS] 真因切り分け用の段階別 fire-and-forget 通知。特定後に削除。
+/**
+ * 段階別 progress ログ。 PR #161 で notifyObs 経由で観測性 DB に流していたが、
+ * 5/8 本番 cron 失敗の真因解析で「notifyObs 7-8 回 × n8n 遅延時の AbortSignal
+ * なし fetch hung が Worker wall time を圧迫し silent kill」を特定したため、
+ * console.log のみに簡略化。 完了 / 失敗 / cron failed の最終通知は別途残す。
+ * cf-logs.py で過去 7 日のログ追跡可能。
+ */
 function debugStage(
-  env: DailyReleasesEnv,
+  _env: DailyReleasesEnv,
   stage: string,
   detail?: string,
 ): void {
-  if (!env.N8N_WEBHOOK_SECRET) return;
-  notifyObs(env.N8N_WEBHOOK_SECRET, {
-    severity: "info",
-    subject: `🟡 daily-releases ${stage}`,
-    summary: detail ?? "",
-  }).catch(() => {});
+  console.log(
+    JSON.stringify({
+      type: "daily_releases_stage",
+      stage,
+      detail: detail?.substring(0, 300),
+    }),
+  );
 }
 
 export async function runDailyReleases(env: DailyReleasesEnv): Promise<void> {
