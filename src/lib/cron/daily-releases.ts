@@ -132,7 +132,7 @@ async function fetchBatchWithRetry(
           "User-Agent": "shirankedo-daily-releases/1.0",
         },
         body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(30000),
+        signal: AbortSignal.timeout(60000),
       });
     } catch (e) {
       // AbortError or network error → retry
@@ -177,10 +177,23 @@ async function fetchBatchWithRetry(
   }
   if (!res) throw new Error("unreachable");
 
-  const json = (await res.json()) as {
+  // 5/7 検証 7th: response body 途中切断で SyntaxError 発生 (PR #166 で観測)。
+  // text() で受け取って手動 parse、 失敗時は該当 batch をスキップして全体完走させる。
+  let json: {
     data?: Record<string, RepoResponse | null>;
     errors?: { message: string }[];
   };
+  try {
+    const text = await res.text();
+    json = JSON.parse(text);
+  } catch (e) {
+    debugStage(
+      env,
+      `GRAPHQL_PARSE_FAIL_batch_${batch.batchIndex}`,
+      `${String(e).substring(0, 200)} (skipping batch)`,
+    );
+    return [];
+  }
   if (json.errors?.length) {
     debugStage(
       env,
