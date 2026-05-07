@@ -4,6 +4,10 @@ import { notifyObs, pingHealthchecks, sanitizeGitHubName } from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const HC_SLUG = "shirankedo-daily-releases";
+// 5/8 検証 11th: クエリ自体を軽量化 (release first:5→1、 BATCH 100→30)。
+// timeout/sleep 調整では release だけ silent kill 解消せず、 GitHub 応答時間
+// と CF wall time の構造的不整合 → query response 1/5 に削減して 1 batch
+// あたりの GitHub 処理時間を短縮、 全体 wall time を圧縮する。
 // 検証履歴:
 // - PR #153 (1 query × 2143 alias): GitHub HTTP 500 (body 過大)
 // - PR #154 (Promise.all × 6 batch × 400 alias): 全 batch HTTP 502
@@ -19,7 +23,7 @@ const HC_SLUG = "shirankedo-daily-releases";
 // - 本 PR: PR #155 sweet spot の BATCH_SIZE 100 に戻す + timeout 30s +
 //   linear sleep + MAX_ATTEMPTS 5。 22 batch sequential、 GitHub node 内、
 //   subreq 22 + α で 50 上限内。
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 30;
 const BATCH_INTERVAL_MS = 200;
 // 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
 // query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
@@ -66,7 +70,7 @@ export function buildReleaseBatches(
     const slice = valid.slice(i, i + BATCH_SIZE);
     const parts = slice.map((repo, j) => {
       const [owner, name] = repo.split("/");
-      return `r${j}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 5, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
+      return `r${j}: repository(owner: "${sanitizeGitHubName(owner)}", name: "${sanitizeGitHubName(name)}") { nameWithOwner releases(first: 1, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { tagName isPrerelease publishedAt name } } }`;
     });
     batches.push({
       query: `{${parts.join(" ")}}`,
