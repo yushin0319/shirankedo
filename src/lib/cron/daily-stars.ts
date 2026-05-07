@@ -22,10 +22,10 @@ const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 const INSERT_CHUNK = 50;
 /**
  * wrangler.jsonc の triggers.crons と同期させる。両方を必ず一緒に変更すること。
- * 5/7 一時検証 6th: UTC 00:45 = JST 09:45 (BATCH 100 sweet spot 復帰)。
+ * 5/7 一時検証 7th: UTC 01:15 = JST 10:15 (timeout 60s + JSON parse 耐性)。
  * 本番 schedule (UTC 15:05 = JST 00:05) は検証完了後に revert PR で戻す。
  */
-export const DAILY_STARS_CRON = "45 0 * * *";
+export const DAILY_STARS_CRON = "15 1 * * *";
 
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
@@ -78,7 +78,7 @@ export async function fetchBatch(
           "User-Agent": "shirankedo-daily-stars/1.0",
         },
         body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(60000),
       });
     } catch (e) {
       if (attempt < MAX_ATTEMPTS) {
@@ -122,13 +122,27 @@ export async function fetchBatch(
     );
   }
   if (!res) throw new Error("unreachable");
-  const json = (await res.json()) as {
+  // 5/7 検証 7th: response body 途中切断で SyntaxError → batch スキップで完走。
+  let json: {
     data?: Record<
       string,
       { nameWithOwner: string; stargazerCount: number } | null
     >;
     errors?: { message: string }[];
   };
+  try {
+    const text = await res.text();
+    json = JSON.parse(text);
+  } catch (e) {
+    console.log(
+      JSON.stringify({
+        type: "graphql_parse_fail",
+        batch: batch.batchIndex,
+        error: String(e).substring(0, 200),
+      }),
+    );
+    return { stars: [], renames: [] };
+  }
   if (json.errors?.length) {
     // partial errors も data があれば続行
     console.log(
