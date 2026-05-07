@@ -13,12 +13,13 @@ const HC_SLUG = "shirankedo-daily-releases";
 //   sleep 累計 wall time 圧迫 → silent kill
 // - 5/7 08:20 JST (PR #163 sleep linear): 504 ゼロ、 batch 12/13 後 silent kill
 // - 5/7 08:50 JST (PR #164 BATCH 20 + timeout 10s): batch 30 後 silent kill
-// - 共通点: subrequest 累積 (warmup + obs notify + batch fetch + d1) が
-//   50 上限 (Free/Bundled tier) に達している疑い。 BATCH_SIZE を逆に大きく
-//   して batch 数を 11 以下に圧縮し subreq 上限超過を回避する。
-// - 本 PR: BATCH_SIZE 200 sequential (~11 batch、 query body ~38KB) +
-//   AbortSignal.timeout(30000) で重い query 対応
-const BATCH_SIZE = 200;
+// - 5/7 09:20 JST (PR #165 BATCH 200 + timeout 30s): cron 完走 115s だが
+//   GitHub GraphQL "Resource limits exceeded" で全 batch 0件。 200 alias は
+//   release(first:5)=1000 node で GitHub complexity 上限超過。
+// - 本 PR: PR #155 sweet spot の BATCH_SIZE 100 に戻す + timeout 30s +
+//   linear sleep + MAX_ATTEMPTS 5。 22 batch sequential、 GitHub node 内、
+//   subreq 22 + α で 50 上限内。
+const BATCH_SIZE = 100;
 const BATCH_INTERVAL_MS = 200;
 // 5/7 検証: 本番 cron context で batch=0 が連続 502 で死亡。 ローカル curl は同
 // query 200 OK のため CF egress proxy or cron context 起因疑い。 retry 上限を
