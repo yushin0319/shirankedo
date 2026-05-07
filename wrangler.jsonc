@@ -6,13 +6,13 @@
   "main": "src/worker.ts",
   // Cron Triggers（最大3本）:
   //   UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
-  //   UTC 16:25 = JST 01:25: stars        ← 5/8 一時検証 9th (本番は UTC 15:05)
-  //   UTC 16:35 = JST 01:35: repos+release ← 5/8 一時検証 9th (本番は UTC 15:10)
+  //   UTC 16:55 = JST 01:55: stars        ← 5/8 一時検証 10th (本番は UTC 15:05)
+  //   UTC 17:05 = JST 02:05: repos+release ← 5/8 一時検証 10th (本番は UTC 15:10)
   //   stars と repos+release は 10 min gap で overlap 回避。
   // 検証完了後に revert PR で本番 schedule (深夜 00:00-00:10 JST 帯) に戻す。
   // 各 WF は DAILY_XXX_ENABLED="true" で実走、未設定は dry-run。
   "triggers": {
-    "crons": ["0 15 * * *", "25 16 * * *", "35 16 * * *"]
+    "crons": ["0 15 * * *", "55 16 * * *", "5 17 * * *"]
   },
   // Cloudflare Dashboard でログ検索（無料枠で約7日保持）
   "observability": {
