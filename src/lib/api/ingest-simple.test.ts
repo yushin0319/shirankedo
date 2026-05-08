@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { pageComments, repoStats, weeklySummaries } from "../../db/schema";
+import { pageComments, repoStats } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
-import {
-  processPageComments,
-  processRepoStats,
-  processWeeklySummary,
-} from "./ingest-simple";
+import { processPageComments, processRepoStats } from "./ingest-simple";
 
 type TestDb = ReturnType<typeof createTestDbWithTables>["db"];
 let db: TestDb;
@@ -29,18 +25,6 @@ describe("processRepoStats", () => {
   it("空配列で inserted: 0", async () => {
     const result = await processRepoStats(db, []);
     expect(result.inserted).toBe(0);
-  });
-});
-
-describe("processWeeklySummary", () => {
-  it("週次レポートを INSERT できる", async () => {
-    const result = await processWeeklySummary(db, {
-      content: "今週のまとめ: AI 関連の話題が多かった",
-    });
-    expect(result.inserted).toBe(1);
-    const rows = await db.select().from(weeklySummaries);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].content).toContain("今週のまとめ");
   });
 });
 

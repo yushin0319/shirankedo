@@ -62,11 +62,6 @@ export const subscriptionPlanSchema = z.object({
   limits: z.string().optional(),
 });
 
-/** 週次サマリー */
-export const weeklySummarySchema = z.object({
-  content: z.string().min(1),
-});
-
 /** リポジトリ rename */
 export const repoRenameSchema = z.object({
   from: z.string().min(1),
