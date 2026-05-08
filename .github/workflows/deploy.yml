@@ -20,6 +20,13 @@ jobs:
           node-version: "22"
       - run: bun install --frozen-lockfile
       - run: bun run build
+      - name: Apply D1 migrations (remote)
+        # drizzle/*.sql を本番 D1 に冪等適用。CI では --y で対話確認をスキップ。
+        # CREATE TABLE / DROP TABLE 等のスキーマ変更を deploy 前に反映してから wrangler deploy。
+        run: bunx wrangler d1 migrations apply shirankedo --remote --y
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: wrangler deploy (with Sentry release tag)
         run: bunx wrangler deploy --var SENTRY_RELEASE:${{ github.sha }}
         env:
