@@ -5,11 +5,6 @@ test.describe("ナビゲーション", () => {
   test("各ページへのナビゲーションリンクが機能する", async ({ page }) => {
     await gotoWithRetry(page, "/");
 
-    // セキュリティへ遷移
-    await page.locator("nav >> text=セキュリティ").click();
-    await page.waitForURL("**/security");
-    await expect(page).toHaveTitle(/セキュリティ/);
-
     // トレンドへ遷移
     await page.locator("nav >> text=トレンド").click();
     await page.waitForURL("**/trend");
@@ -24,7 +19,6 @@ test.describe("ナビゲーション", () => {
   test("各ページのタイトルが正しい", async ({ page }) => {
     const pages = [
       { path: "/", expected: "ニュース" },
-      { path: "/security", expected: "セキュリティ" },
       { path: "/trend", expected: "トレンド" },
       { path: "/ai", expected: "AI比較" },
       { path: "/about", expected: "About" },

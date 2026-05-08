@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -W)"
 DUMP_FILE="$SCRIPT_DIR/.seed-dump.json"
 SQL_FILE="$SCRIPT_DIR/.seed-insert.sql"
 
-TABLES="articles tracking_repos repo_stats releases vulnerabilities security_daily llm_models subscription_plans weekly_summaries page_comments llm_model_history subscription_plan_history"
+TABLES="articles tracking_repos repo_stats releases llm_models subscription_plans weekly_summaries page_comments llm_model_history subscription_plan_history"
 
 echo "📡 本番D1から全テーブルをダンプ中..."
 

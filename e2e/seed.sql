@@ -39,22 +39,6 @@ INSERT INTO subscription_plans (provider, service, plan_name, price, currency, m
 ('Anthropic', 'Claude', 'Pro', 20, 'USD', '["Claude Opus 4.6","Claude Sonnet 4.6"]', 'Opus: 5x usage'),
 ('Google', 'Gemini', 'Advanced', 2900, 'JPY', '["Gemini 3.1 Pro","Gemini 3 Flash"]', '2TB Google One 付き');
 
--- vulnerabilities（13件）
-INSERT INTO vulnerabilities (cve_id, title, cvss_score, published_at) VALUES
-('CVE-2026-10001', 'Linux Kernel権限昇格', 9.8, '2026-03-18'),
-('CVE-2026-10002', 'OpenSSL証明書検証バイパス', 9.5, '2026-03-17'),
-('CVE-2026-10003', 'Apache HTTPD RCE', 9.3, '2026-03-17'),
-('CVE-2026-10004', 'Node.js プロトタイプ汚染', 9.1, '2026-03-16'),
-('CVE-2026-10005', 'PostgreSQL認証バイパス', 9.0, '2026-03-16'),
-('CVE-2026-10006', 'Redis未認証アクセス', 8.8, '2026-03-15'),
-('CVE-2026-10007', 'nginx ヘッダインジェクション', 8.5, '2026-03-15'),
-('CVE-2026-10008', 'Docker コンテナ脱出', 8.3, '2026-03-14'),
-('CVE-2026-10009', 'Chrome V8 型混同', 8.1, '2026-03-14'),
-('CVE-2026-10010', 'MySQL権限昇格', 8.0, '2026-03-13'),
-('CVE-2026-10011', 'Python pickle任意コード実行', 7.8, '2026-03-13'),
-('CVE-2026-10012', 'Go net/http DoS', 7.5, '2026-03-12'),
-('CVE-2026-10013', 'Java Log4j新脆弱性', 7.3, '2026-03-12');
-
 -- tracking_repos（13件、1件はNEW判定用に直近publishedAt）
 INSERT INTO tracking_repos (repo, display_name, description, language, published_at) VALUES
 ('vercel/next.js', 'Next.js', 'Reactフレームワーク', 'TypeScript', '2025-01-01'),
@@ -102,10 +86,6 @@ INSERT INTO releases (repo, tag, version, type, published_at) VALUES
 ('facebook/react', 'v19.2.5', '19.2.5', 'minor', '2026-03-13'),
 ('sveltejs/svelte', 'v5.3.0', '5.3.0', 'minor', '2026-03-12'),
 ('vuejs/core', 'v3.6.1', '3.6.1', 'minor', '2026-03-12');
-
--- security_daily（1件）
-INSERT INTO security_daily (comment) VALUES
-('今日はLinuxカーネルとOpenSSLに重大な脆弱性が公開されたよ。特にCVE-2026-10001は権限昇格でCVSS 9.8だから、早めにパッチ当てた方がいいかも。Next.jsとDenoのメジャーアップデートもあるし、忙しい一日だね。');
 
 -- page_comments（付箋コメント）
 INSERT INTO page_comments (type, content) VALUES

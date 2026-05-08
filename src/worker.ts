@@ -9,19 +9,14 @@ import {
 } from "./lib/cron/daily-releases";
 import { type DailyReposEnv, runDailyRepos } from "./lib/cron/daily-repos";
 import {
-  type DailySecurityEnv,
-  runDailySecurity,
-} from "./lib/cron/daily-security";
-import {
   DAILY_STARS_CRON,
   type DailyStarsEnv,
   pingHealthchecks as pingHcStars,
   runDailyStars,
 } from "./lib/cron/daily-stars";
-import { type DailyVulnsEnv, runDailyVulns } from "./lib/cron/daily-vulns";
 import { logCronError } from "./lib/cron/log-cron-error";
 
-// UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
+// UTC 15:00 = JST 00:00: articles 単独 (BATCH cron 名は履歴的に維持)
 const DAILY_BATCH_CRON = "0 15 * * *";
 // UTC 15:10 = JST 00:10: repos + release (release は DAILY_RELEASES_ENABLED=false で
 // 一時停止中、 5/8 検証で CF wall time 不足判明、 翌日 案 D で対応予定)
@@ -36,8 +31,6 @@ type WorkerEnv = {
 } & DailyStarsEnv &
   DailyArticlesEnv &
   DailyReleasesEnv &
-  DailyVulnsEnv &
-  DailySecurityEnv &
   DailyReposEnv;
 
 interface WorkerScheduledController {
@@ -84,30 +77,11 @@ export default {
       }
 
       case DAILY_BATCH_CRON: {
-        // articles / vulns / security を並列実行 (release は subreq 50 limit 突破で
-        // 通知無音化したため REPOS_CRON 側に移動した。Promise.allSettled で 1 つ失敗
-        // しても他が止まらないようにする)
+        // articles のみ実行 (vulns / security は task #555 で削除済み、
+        // release は subreq 50 limit 突破で通知無音化したため REPOS_CRON 側に移動)
         ctx.waitUntil(
-          Promise.allSettled([
-            runDailyArticles(env).catch((e) => {
-              logCronError("daily-articles", e, env, ctx);
-            }),
-            runDailyVulns(env).catch((e) => {
-              logCronError("daily-vulns", e, env, ctx);
-            }),
-            runDailySecurity(env).catch((e) => {
-              logCronError("daily-security", e, env, ctx);
-            }),
-          ]).then((results) => {
-            const failed = results.filter((r) => r.status === "rejected");
-            if (failed.length > 0) {
-              console.log(
-                JSON.stringify({
-                  type: "daily_batch_partial_failure",
-                  failed_count: failed.length,
-                }),
-              );
-            }
+          runDailyArticles(env).catch((e) => {
+            logCronError("daily-articles", e, env, ctx);
           }),
         );
         break;

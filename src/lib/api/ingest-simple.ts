@@ -1,18 +1,12 @@
-// シンプル INSERT 系のロジック（repo-stats, weekly-summaries, page-comments, security-daily）
+// シンプル INSERT 系のロジック（repo-stats, weekly-summaries, page-comments）
 
 import { z } from "zod";
 import type { AppDatabase } from "../../db/client";
-import {
-  pageComments,
-  repoStats,
-  securityDaily,
-  weeklySummaries,
-} from "../../db/schema";
+import { pageComments, repoStats, weeklySummaries } from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
 import {
   pageCommentSchema,
   repoStatSchema,
-  securityDailySchema,
   weeklySummarySchema,
 } from "./schemas";
 
@@ -54,16 +48,4 @@ export async function processPageComments(
     );
   }
   return { inserted: parsed.length };
-}
-
-/** security-daily: セキュリティ日次サマリー INSERT */
-export async function processSecurityDaily(
-  db: AppDatabase,
-  data: unknown,
-): Promise<{ inserted: number }> {
-  const parsed = securityDailySchema.parse(data);
-  await queryD1("security_daily.insert", () =>
-    db.insert(securityDaily).values(parsed),
-  );
-  return { inserted: 1 };
 }

@@ -22,6 +22,13 @@
       "when": 1773813113552,
       "tag": "0002_easy_bill_hollister",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1778239289017,
+      "tag": "0003_remove-security-vulns",
+      "breakpoints": true
     }
   ]
 }

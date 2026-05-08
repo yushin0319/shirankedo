@@ -29,7 +29,6 @@ jobs:
         run: |
           for url in \
             "https://shirankedo.y-fudo.workers.dev/" \
-            "https://shirankedo.y-fudo.workers.dev/security" \
             "https://shirankedo.y-fudo.workers.dev/ai" \
             "https://shirankedo.y-fudo.workers.dev/trend"; do
             status=$(curl -s -o /dev/null -w '%{http_code}' "$url")

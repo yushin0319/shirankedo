@@ -5,7 +5,7 @@
   // Astro v6 の build 出力に scheduled handler を併載するための custom entrypoint
   "main": "src/worker.ts",
   // Cron Triggers（最大3本、 5分刻みで深夜 00:00-00:10 JST 帯に集約）:
-  //   UTC 15:00 = JST 00:00: articles + vulns + security（BATCH 並列）
+  //   UTC 15:00 = JST 00:00: articles
   //   UTC 15:05 = JST 00:05: stars
   //   UTC 15:10 = JST 00:10: repos + release（release は DAILY_RELEASES_ENABLED
   //                                            =false で一時停止）
@@ -25,11 +25,9 @@
   ],
   "vars": {
     "DAILY_ARTICLES_ENABLED": "true",
-    "DAILY_VULNS_ENABLED": "true",
     // 5/8 一時停止: CF Workers cron で 12 PR (#160-172) 試行も release のみ
     // wall time 圧迫で silent kill。 翌日 案 D (n8n WF 復活) で再開予定。
     "DAILY_RELEASES_ENABLED": "false",
-    "DAILY_SECURITY_ENABLED": "true",
     "DAILY_REPOS_ENABLED": "true"
   },
   "d1_databases": [

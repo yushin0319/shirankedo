@@ -1,17 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  releases,
-  repoStats,
-  trackingRepos,
-  vulnerabilities,
-} from "../../db/schema";
+import { releases, repoStats, trackingRepos } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
 import {
   getTrackingRepos,
   processReleases,
   processRepoRenames,
   processTrackingRepos,
-  processVulnerabilities,
 } from "./ingest-upsert";
 
 type TestDb = ReturnType<typeof createTestDbWithTables>["db"];
@@ -20,42 +14,6 @@ let db: TestDb;
 beforeEach(() => {
   const t = createTestDbWithTables();
   db = t.db;
-});
-
-describe("processVulnerabilities", () => {
-  const validVuln = {
-    cveId: "CVE-2026-12345",
-    title: "脆弱性タイトル",
-    cvssScore: 9.8,
-    publishedAt: "2026-03-15",
-  };
-
-  it("脆弱性を INSERT できる", async () => {
-    const result = await processVulnerabilities(db, [validVuln]);
-    expect(result.inserted).toBe(1);
-    expect(result.updated).toBe(0);
-    const rows = await db.select().from(vulnerabilities);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].cvssScore).toBe(9.8);
-  });
-
-  it("既存の CVE を UPDATE できる", async () => {
-    await processVulnerabilities(db, [validVuln]);
-    const result = await processVulnerabilities(db, [
-      { ...validVuln, cvssScore: 7.5, title: "更新タイトル" },
-    ]);
-    expect(result.inserted).toBe(0);
-    expect(result.updated).toBe(1);
-    const rows = await db.select().from(vulnerabilities);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].cvssScore).toBe(7.5);
-    expect(rows[0].title).toBe("更新タイトル");
-  });
-
-  it("空配列で 0/0 を返す", async () => {
-    const result = await processVulnerabilities(db, []);
-    expect(result).toEqual({ inserted: 0, updated: 0 });
-  });
 });
 
 describe("processReleases", () => {
