@@ -132,13 +132,6 @@ export const subscriptionPlanHistory = sqliteTable(
   },
 );
 
-// 週次レポート（内部参考用）
-export const weeklySummaries = sqliteTable("weekly_summaries", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  content: text("content").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-});
-
 // ページ付箋コメント
 export const pageComments = sqliteTable("page_comments", {
   id: integer("id").primaryKey({ autoIncrement: true }),

@@ -8,7 +8,6 @@ import {
   repoStatSchema,
   subscriptionPlanSchema,
   trackingRepoSchema,
-  weeklySummarySchema,
 } from "./schemas";
 
 describe("articleSchema", () => {
@@ -167,15 +166,6 @@ describe("subscriptionPlanSchema", () => {
         '["claude-opus-4-6","claude-sonnet-4-6"]',
       );
     }
-  });
-});
-
-describe("weeklySummarySchema", () => {
-  it("content のみで有効", () => {
-    const result = weeklySummarySchema.safeParse({
-      content: "今週のまとめ",
-    });
-    expect(result.success).toBe(true);
   });
 });
 

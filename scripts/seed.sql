@@ -201,20 +201,6 @@ INSERT OR REPLACE INTO subscription_plans (provider, service, plan_name, price, 
   ('xAI',        'Grok',       'Free',        0,     'JPY', '["Grok 3 mini"]',                                      'X(Twitter)アカウント必須'),
   ('xAI',        'Grok',       'Premium+',    1960,  'JPY', '["Grok 3","Grok 3 mini","Aurora"]',                    'X Premium+ 込み');
 
--- 週次サマリー
-INSERT INTO weekly_summaries (content) VALUES
-('## 今週のテック界隈まとめ（3/7〜3/13）
-
-**AIがアツすぎる1週間やった！**
-
-GPT-5発表でAI界隈が大騒ぎ。マルチモーダル推論がガチで進化してて、もう何でもできる感じ。Copilotのコードレビュー機能も正式リリースされて、開発者のワークフローが変わりそう。
-
-**OSS・言語系も動きあり**
-Rust 2.0ロードマップ公開、Deno 3.0リリースとか、言語・ランタイム界隈も盛り上がってる。
-
-**セキュリティは要注意**
-Linux カーネルの権限昇格（CVSS 9.0）は早めに対応推奨。Node.jsのHTTPスマグリングも見逃さんように。');
-
 -- ページコメント
 INSERT INTO page_comments (type, content) VALUES
 ('trend', 'トレンド的にはuvとvLLMの伸びがエグいな〜。Python界隈のツール革命が止まらんわ。Biomeも地味に伸びてるし、Webツールチェーンの世代交代進んでるって感じ。知らんけど'),

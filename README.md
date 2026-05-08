@@ -31,7 +31,6 @@
 | カテゴリ | エンドポイント |
 |---|---|
 | 記事 | `articles` / `articles/recent` / `articles/urls` |
-| 週次まとめ | `weekly-summaries` / `weekly-summaries/recent` |
 | トレンド | `trend-ranking` / `tracking-repos` / `repo-stats` / `repo-renames` |
 | 参考データ | `releases` / `llm-models` / `subscription-plans` / `exchange-rate` / `page-comments` |
 
@@ -65,7 +64,7 @@ post-deploy smoke test（5 ページの 200 OK 確認）が走り、失敗時は
 
 ```
 n8n cron (日次 0:00 JST / 週次 月曜 3:00 JST)
-  ↓ POST /api/ingest/{articles,vulnerabilities,weekly-summaries,...}
+  ↓ POST /api/ingest/{articles,trend-ranking,page-comments,...}
   ↓ X-API-Key 認証 + Zod バリデーション + upsert
 Cloudflare D1 (shirankedo)
   ↓ SSR
