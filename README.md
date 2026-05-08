@@ -3,7 +3,7 @@
 テック界隈で今日起きたことを 3 分で把握するギャル口調ニュースダッシュボード。RSS 取得・AI 要約・スコアリング・トレンド分析を [n8n](https://github.com/yushin0319/n8n-server) cron が回し、Astro SSR + Cloudflare Workers で配信する。
 
 - **本番**: https://shirankedo.y-fudo.workers.dev/
-- **ページ**: `/`（ホーム）/ `/security` / `/ai` / `/trend` / `/about`
+- **ページ**: `/`（ホーム）/ `/ai` / `/trend` / `/about`
 
 ## スタック
 
@@ -31,9 +31,7 @@
 | カテゴリ | エンドポイント |
 |---|---|
 | 記事 | `articles` / `articles/recent` / `articles/urls` |
-| 脆弱性 | `vulnerabilities` / `vulnerabilities/cve-ids` |
 | 週次まとめ | `weekly-summaries` / `weekly-summaries/recent` |
-| セキュリティ | `security-daily` / `security-top` |
 | トレンド | `trend-ranking` / `tracking-repos` / `repo-stats` / `repo-renames` |
 | 参考データ | `releases` / `llm-models` / `subscription-plans` / `exchange-rate` / `page-comments` |
 

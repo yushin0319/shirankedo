@@ -96,21 +96,6 @@ INSERT OR REPLACE INTO repo_stats (repo, stars, created_at) VALUES
   ('modelcontextprotocol/servers',  80210, '2026-03-06');
 
 -- ============================================================
--- vulnerabilities  (security.html > #tab-vulns > .vuln-card, 全10件)
--- ============================================================
-INSERT OR REPLACE INTO vulnerabilities (cve_id, title, cvss_score, published_at) VALUES
-  ('CVE-2026-28466', 'OpenClaw Gateway 承認バイパス — system.run の実行承認チェックを回避可能',           9.9,  '2026-03-05'),
-  ('CVE-2026-2599',  'WordPress Contact Form 7 DB プラグイン — PHP Object Injection（未認証）',          9.8,  '2026-03-05'),
-  ('CVE-2026-20079', 'Cisco Secure FMC 認証バイパス — スクリプト実行で root 取得',                       10.0, '2026-03-04'),
-  ('CVE-2026-20131', 'Cisco Secure FMC Javaデシリアライズ — 未認証でroot RCE',                           10.0, '2026-03-04'),
-  ('CVE-2026-29000', 'pac4j-jwt 認証バイパス — RSA公開鍵で暗号化JWT偽造が可能',                          10.0, '2026-03-04'),
-  ('CVE-2026-29045', 'Hono serveStatic ミドルウェアバイパス — URLデコード不整合でルートベース認証を回避',  7.5,  '2026-03-04'),
-  ('CVE-2026-28697', 'Craft CMS SSTI — Twigテンプレート経由のRCE（管理者権限）',                         9.1,  '2026-03-04'),
-  ('CVE-2026-24898', 'OpenEMR MedExコールバック — 未認証でAPIトークン漏洩',                               10.0, '2026-03-03'),
-  ('CVE-2026-27971', 'Qwik server$ RPC デシリアライズRCE — 未認証で単一HTTPリクエストから任意コード実行',  9.8,  '2026-03-03'),
-  ('CVE-2026-3136',  'Google Cloud Build GitHub Trigger — コメント制御不備による任意コード実行',          9.8,  '2026-03-03');
-
--- ============================================================
 -- releases  (security.html > #tab-updates > .update-card, 全10件)
 -- type: update-bar-minor → 'minor', update-bar-major → 'major'
 -- ============================================================
@@ -125,12 +110,6 @@ INSERT OR REPLACE INTO releases (repo, tag, version, type, published_at) VALUES
   ('comfyanonymous/ComfyUI',   'v0.16.0',  '0.16.0',  'minor', '2026-03-05'),
   ('home-assistant/core',      '2026.3.0', '2026.3.0','minor', '2026-03-04'),
   ('louislam/uptime-kuma',     'v2.2.0',   '2.2.0',   'minor', '2026-03-05');
-
--- ============================================================
--- security_daily  (security.html > .summary-sticky > .gal-text)
--- ============================================================
-INSERT OR REPLACE INTO security_daily (comment) VALUES
-  ('今週はCiscoのFMCに認証バイパス+RCEがCVSS満点で出てるのと、pac4j-jwtが公開鍵だけでトークン偽造できちゃうのがヤバい。Java系の認証ライブラリ使ってる人は要確認。あとQwikのserver$にRCE出てるの地味にでかい。JSフレームワーク使ってるならバージョン確認して。アプデ側はshadcn/ui v4がメジャーきた！breaking changes多めだから、まずchangelog読んでからね。vllmも0.17で推論まわり色々変わってるっぽい。');
 
 -- ============================================================
 -- llm_models  (ai-compare.html > #api-tbody, 全56件)

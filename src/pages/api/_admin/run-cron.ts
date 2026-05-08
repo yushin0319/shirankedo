@@ -1,4 +1,4 @@
-// POST /api/_admin/run-cron?name=<articles|vulns|releases|repos|security>
+// POST /api/_admin/run-cron?name=<articles|releases|repos>
 // 開発・障害復旧用の手動 cron トリガー。X-Admin-Secret ヘッダー認証 (= INGEST_API_KEY と同じ値)。
 // 通常運用では Cloudflare Cron Triggers が自動発火するので不要。
 
@@ -16,14 +16,6 @@ import {
   type DailyReposEnv,
   runDailyRepos,
 } from "../../../lib/cron/daily-repos";
-import {
-  type DailySecurityEnv,
-  runDailySecurity,
-} from "../../../lib/cron/daily-security";
-import {
-  type DailyVulnsEnv,
-  runDailyVulns,
-} from "../../../lib/cron/daily-vulns";
 
 function timingSafeEqual(a: string, b: string): boolean {
   const enc = new TextEncoder();
@@ -51,24 +43,17 @@ export const POST: APIRoute = async ({ request, url }) => {
       case "articles":
         await runDailyArticles(env as unknown as DailyArticlesEnv);
         break;
-      case "vulns":
-        await runDailyVulns(env as unknown as DailyVulnsEnv);
-        break;
       case "releases":
         await runDailyReleases(env as unknown as DailyReleasesEnv);
         break;
       case "repos":
         await runDailyRepos(env as unknown as DailyReposEnv);
         break;
-      case "security":
-        await runDailySecurity(env as unknown as DailySecurityEnv);
-        break;
       default:
         return new Response(
           JSON.stringify({
             ok: false,
-            error:
-              "Invalid name. Use one of: articles, vulns, releases, repos, security",
+            error: "Invalid name. Use one of: articles, releases, repos",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );

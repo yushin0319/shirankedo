@@ -8,7 +8,6 @@ const { title, currentPage = "news" } = Astro.props;
 
 const navItems = [
 	{ id: "news", label: "ニュース", href: "/" },
-	{ id: "security", label: "セキュリティ", href: "/security" },
 	{ id: "trend", label: "トレンド", href: "/trend" },
 	{ id: "ai", label: "AI比較", href: "/ai" },
 ];
@@ -131,7 +130,7 @@ const navItems = [
 			});
 
 			// セクション間フリック切り替え
-			const SECTIONS = ["/", "/security", "/trend", "/ai"];
+			const SECTIONS = ["/", "/trend", "/ai"];
 			const SWIPE_THRESHOLD = 50;
 			let touchStart: { x: number; y: number } | null = null;
 

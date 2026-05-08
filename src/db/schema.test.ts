@@ -7,10 +7,8 @@ import {
   pageComments,
   releases,
   repoStats,
-  securityDaily,
   subscriptionPlanHistory,
   subscriptionPlans,
-  vulnerabilities,
 } from "./schema";
 import { createTestDbWithTables } from "./test-helper";
 
@@ -189,45 +187,6 @@ describe("subscriptionPlans", () => {
   });
 });
 
-describe("vulnerabilities", () => {
-  it("cvssScore降順でソートされる", async () => {
-    await db.insert(vulnerabilities).values([
-      {
-        cveId: "CVE-2026-001",
-        title: "低危険度",
-        cvssScore: 3.5,
-        publishedAt: "2026-03-10",
-      },
-      {
-        cveId: "CVE-2026-002",
-        title: "高危険度",
-        cvssScore: 9.8,
-        publishedAt: "2026-03-12",
-      },
-    ]);
-
-    const rows = await db
-      .select()
-      .from(vulnerabilities)
-      .orderBy(desc(vulnerabilities.cvssScore));
-
-    expect(rows[0].title).toBe("高危険度");
-    expect(rows[0].cvssScore).toBe(9.8);
-  });
-
-  it("cvssScoreがnullでも挿入できる", async () => {
-    await db.insert(vulnerabilities).values({
-      cveId: "CVE-2026-003",
-      title: "スコア未定",
-      cvssScore: null,
-      publishedAt: "2026-03-13",
-    });
-
-    const rows = await db.select().from(vulnerabilities);
-    expect(rows[0].cvssScore).toBeNull();
-  });
-});
-
 describe("repoStats", () => {
   it("同一リポの2週分データからstar差分を計算できる", async () => {
     await db.insert(repoStats).values([
@@ -282,21 +241,6 @@ describe("releases", () => {
     await expect(
       db.insert(releases).values({ ...release, version: "19.0.1" }),
     ).rejects.toThrow();
-  });
-});
-
-describe("securityDaily", () => {
-  it("JSON配列のvuln_ids/release_idsを保存・取得できる", async () => {
-    await db.insert(securityDaily).values({
-      comment: "今日のセキュリティまとめ",
-      vulnIds: '["CVE-2026-001","CVE-2026-002"]',
-      releaseIds: "[1,2]",
-    });
-
-    const rows = await db.select().from(securityDaily);
-    expect(rows).toHaveLength(1);
-    const vulns = JSON.parse(rows[0].vulnIds ?? "[]");
-    expect(vulns).toEqual(["CVE-2026-001", "CVE-2026-002"]);
   });
 });
 

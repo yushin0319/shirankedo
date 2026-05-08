@@ -6,10 +6,8 @@ import {
   pageCommentSchema,
   releaseSchema,
   repoStatSchema,
-  securityDailySchema,
   subscriptionPlanSchema,
   trackingRepoSchema,
-  vulnerabilitySchema,
   weeklySummarySchema,
 } from "./schemas";
 
@@ -83,27 +81,6 @@ describe("dailyArticlesSchema", () => {
   });
 });
 
-describe("vulnerabilitySchema", () => {
-  it("有効なデータをパースできる", () => {
-    const result = vulnerabilitySchema.safeParse({
-      cveId: "CVE-2026-12345",
-      title: "脆弱性タイトル",
-      cvssScore: 9.8,
-      publishedAt: "2026-03-15",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("cvssScore は省略可能", () => {
-    const result = vulnerabilitySchema.safeParse({
-      cveId: "CVE-2026-12345",
-      title: "脆弱性",
-      publishedAt: "2026-03-15",
-    });
-    expect(result.success).toBe(true);
-  });
-});
-
 describe("releaseSchema", () => {
   it("有効なデータをパースできる", () => {
     const result = releaseSchema.safeParse({
@@ -125,21 +102,6 @@ describe("releaseSchema", () => {
       publishedAt: "2026-03-15",
     });
     expect(result.success).toBe(false);
-  });
-});
-
-describe("securityDailySchema", () => {
-  it("vulnIds と releaseIds は JSON 文字列に変換される", () => {
-    const result = securityDailySchema.safeParse({
-      comment: "今日のまとめ",
-      vulnIds: ["CVE-2026-001"],
-      releaseIds: [1, 2],
-    });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.vulnIds).toBe('["CVE-2026-001"]');
-      expect(result.data.releaseIds).toBe("[1,2]");
-    }
   });
 });
 

@@ -50,17 +50,6 @@ export const repoStats = sqliteTable(
   (table) => [index("repo_stats_repo_idx").on(table.repo)],
 );
 
-// 脆弱性
-export const vulnerabilities = sqliteTable("vulnerabilities", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  cveId: text("cve_id").unique().notNull(),
-  title: text("title").notNull(),
-  cvssScore: real("cvss_score"),
-  publishedAt: text("published_at").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at"),
-});
-
 // リリース
 export const releases = sqliteTable(
   "releases",
@@ -78,16 +67,6 @@ export const releases = sqliteTable(
     uniqueIndex("releases_repo_tag_unique").on(table.repo, table.tag),
   ],
 );
-
-// セキュリティ日次サマリー
-export const securityDaily = sqliteTable("security_daily", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  comment: text("comment").notNull(),
-  vulnIds: text("vuln_ids"), // JSON配列
-  releaseIds: text("release_ids"), // JSON配列
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at"),
-});
 
 // LLMモデル共通カラム（現在テーブルと履歴テーブルで共有）
 const llmModelDataColumns = {

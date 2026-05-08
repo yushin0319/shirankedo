@@ -1,15 +1,9 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  pageComments,
-  repoStats,
-  securityDaily,
-  weeklySummaries,
-} from "../../db/schema";
+import { pageComments, repoStats, weeklySummaries } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
 import {
   processPageComments,
   processRepoStats,
-  processSecurityDaily,
   processWeeklySummary,
 } from "./ingest-simple";
 
@@ -71,27 +65,5 @@ describe("processPageComments", () => {
   it("空配列で inserted: 0", async () => {
     const result = await processPageComments(db, []);
     expect(result.inserted).toBe(0);
-  });
-});
-
-describe("processSecurityDaily", () => {
-  it("セキュリティ日次サマリーを INSERT できる", async () => {
-    const result = await processSecurityDaily(db, {
-      comment: "今日のセキュリティまとめ",
-      vulnIds: ["CVE-2026-001", "CVE-2026-002"],
-      releaseIds: [1, 2, 3],
-    });
-    expect(result.inserted).toBe(1);
-    const rows = await db.select().from(securityDaily);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].vulnIds).toBe('["CVE-2026-001","CVE-2026-002"]');
-    expect(rows[0].releaseIds).toBe("[1,2,3]");
-  });
-
-  it("vulnIds/releaseIds は省略可能", async () => {
-    const result = await processSecurityDaily(db, {
-      comment: "特になし",
-    });
-    expect(result.inserted).toBe(1);
   });
 });

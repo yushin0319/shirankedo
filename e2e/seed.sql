@@ -103,10 +103,6 @@ INSERT INTO releases (repo, tag, version, type, published_at) VALUES
 ('sveltejs/svelte', 'v5.3.0', '5.3.0', 'minor', '2026-03-12'),
 ('vuejs/core', 'v3.6.1', '3.6.1', 'minor', '2026-03-12');
 
--- security_daily（1件）
-INSERT INTO security_daily (comment) VALUES
-('今日はLinuxカーネルとOpenSSLに重大な脆弱性が公開されたよ。特にCVE-2026-10001は権限昇格でCVSS 9.8だから、早めにパッチ当てた方がいいかも。Next.jsとDenoのメジャーアップデートもあるし、忙しい一日だね。');
-
 -- page_comments（付箋コメント）
 INSERT INTO page_comments (type, content) VALUES
 ('ai_api', 'Gemini 3.1 ProがGPT-5.4を僅差で上回ってスコアトップに。コスパではDeepSeek V4が圧倒的。'),

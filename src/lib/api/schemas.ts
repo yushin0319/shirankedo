@@ -17,14 +17,6 @@ export const articleSchema = z.object({
 /** 記事配列（POST /api/ingest/articles のリクエストボディ） */
 export const dailyArticlesSchema = z.array(articleSchema);
 
-/** 脆弱性 */
-export const vulnerabilitySchema = z.object({
-  cveId: z.string().min(1),
-  title: z.string().min(1),
-  cvssScore: z.number().optional(),
-  publishedAt: z.string().min(1),
-});
-
 /** リリース */
 export const releaseSchema = z.object({
   repo: z.string().min(1),
@@ -32,19 +24,6 @@ export const releaseSchema = z.object({
   version: z.string().min(1),
   type: z.enum(["major", "minor"]),
   publishedAt: z.string().min(1),
-});
-
-/** セキュリティ日次サマリー */
-export const securityDailySchema = z.object({
-  comment: z.string().min(1),
-  vulnIds: z
-    .array(z.string())
-    .optional()
-    .transform((v) => (v ? JSON.stringify(v) : undefined)),
-  releaseIds: z
-    .array(z.union([z.string(), z.number()]))
-    .optional()
-    .transform((v) => (v ? JSON.stringify(v) : undefined)),
 });
 
 /** 追跡リポジトリ */

@@ -1,71 +1,16 @@
-// UPSERT 系のロジック（vulnerabilities, releases, tracking-repos）
+// UPSERT 系のロジック（releases, tracking-repos）
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "../../db/client";
-import {
-  releases,
-  repoStats,
-  trackingRepos,
-  vulnerabilities,
-} from "../../db/schema";
+import { releases, repoStats, trackingRepos } from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
-import {
-  releaseSchema,
-  repoRenameSchema,
-  trackingRepoSchema,
-  vulnerabilitySchema,
-} from "./schemas";
+import { releaseSchema, repoRenameSchema, trackingRepoSchema } from "./schemas";
 
-// D1 は 1 prepared statement あたり最大 100 bound parameter。 各テーブル INSERT
-// 列数は releases/trackingRepos が 6、 vulnerabilities が 5。 50 件 × 6 列 = 300
-// は超過するが、 実測で vulnerabilities 70 件 × 5 = 350 は通過、 releases 72
-// 件 × 6 = 432 で失敗 (PR #155 03:20 UTC) → 限界は ~350-432 の間。 16 件以下なら
-// 16 × 6 = 96 < 100 で確実に safe。 daily 実 INSERT は最大 100 件程度なので
-// chunk 数 7 でも subrequest 50 limit 内余裕。
+// D1 は 1 prepared statement あたり最大 100 bound parameter。 releases/trackingRepos
+// は INSERT 列数 6 のため 50 件 × 6 = 300 は超過するが、 16 件以下なら 16 × 6 = 96
+// < 100 で確実に safe。 daily 実 INSERT は最大 100 件程度なので chunk 数 7 でも
+// subrequest 50 limit 内余裕。
 const INSERT_CHUNK_SIZE = 16;
-
-/** vulnerabilities: UPSERT（cvssScore 更新あり） */
-export async function processVulnerabilities(
-  db: AppDatabase,
-  data: unknown[],
-): Promise<{ inserted: number; updated: number }> {
-  if (data.length === 0) return { inserted: 0, updated: 0 };
-  const parsed = z.array(vulnerabilitySchema).parse(data);
-
-  const cveIds = parsed.map((v) => v.cveId);
-  const existing = await queryD1("vulnerabilities.existing", () =>
-    db
-      .select({ cveId: vulnerabilities.cveId })
-      .from(vulnerabilities)
-      .where(inArray(vulnerabilities.cveId, cveIds)),
-  );
-  const existingSet = new Set(existing.map((r) => r.cveId));
-
-  const newItems = parsed.filter((v) => !existingSet.has(v.cveId));
-  const updateItems = parsed.filter((v) => existingSet.has(v.cveId));
-
-  for (let i = 0; i < newItems.length; i += INSERT_CHUNK_SIZE) {
-    await queryD1("vulnerabilities.insert_chunk", () =>
-      db
-        .insert(vulnerabilities)
-        .values(newItems.slice(i, i + INSERT_CHUNK_SIZE)),
-    );
-  }
-  for (const item of updateItems) {
-    await queryD1("vulnerabilities.update", () =>
-      db
-        .update(vulnerabilities)
-        .set({
-          title: item.title,
-          cvssScore: item.cvssScore,
-          publishedAt: item.publishedAt,
-          updatedAt: new Date().toISOString(),
-        })
-        .where(eq(vulnerabilities.cveId, item.cveId)),
-    );
-  }
-  return { inserted: newItems.length, updated: updateItems.length };
-}
 
 /** releases: INSERT（repo+tag 重複スキップ） */
 export async function processReleases(
