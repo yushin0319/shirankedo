@@ -1,1 +1,1 @@
-DROP TABLE `releases`;
+DROP TABLE IF EXISTS `releases`;

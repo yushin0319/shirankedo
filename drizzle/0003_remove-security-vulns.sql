@@ -1,2 +1,2 @@
-DROP TABLE `security_daily`;--> statement-breakpoint
-DROP TABLE `vulnerabilities`;
+DROP TABLE IF EXISTS `security_daily`;--> statement-breakpoint
+DROP TABLE IF EXISTS `vulnerabilities`;
