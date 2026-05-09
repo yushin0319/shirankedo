@@ -11,20 +11,27 @@ import {
 } from "drizzle-orm/sqlite-core";
 
 // 記事
-export const articles = sqliteTable("articles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  url: text("url").unique().notNull(),
-  title: text("title").notNull(),
-  source: text("source").notNull(),
-  summary: text("summary").notNull(),
-  comment: text("comment").notNull(),
-  tags: text("tags").notNull(), // JSON配列
-  impact: integer("impact").notNull(),
-  isPaper: integer("is_paper").notNull().default(0),
-  publishedAt: text("published_at").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at"),
-});
+export const articles = sqliteTable(
+  "articles",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    url: text("url").unique().notNull(),
+    title: text("title").notNull(),
+    source: text("source").notNull(),
+    summary: text("summary").notNull(),
+    comment: text("comment").notNull(),
+    tags: text("tags").notNull(), // JSON配列
+    impact: integer("impact").notNull(),
+    isPaper: integer("is_paper").notNull().default(0),
+    publishedAt: text("published_at").notNull(),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at"),
+  },
+  (table) => [
+    // ingest-articles-read.ts: gte(publishedAt, since) + orderBy(desc(publishedAt))
+    index("articles_published_at_idx").on(table.publishedAt),
+  ],
+);
 
 // 追跡リポジトリ
 export const trackingRepos = sqliteTable("tracking_repos", {
@@ -47,7 +54,11 @@ export const repoStats = sqliteTable(
     stars: integer("stars").notNull(),
     createdAt: text("created_at").default(sql`(datetime('now'))`),
   },
-  (table) => [index("repo_stats_repo_idx").on(table.repo)],
+  (table) => [
+    index("repo_stats_repo_idx").on(table.repo),
+    // trend-ranking.ts / trend.astro: orderBy(desc(createdAt))
+    index("repo_stats_created_at_idx").on(table.createdAt),
+  ],
 );
 
 // LLMモデル共通カラム（現在テーブルと履歴テーブルで共有）
@@ -115,9 +126,16 @@ export const subscriptionPlanHistory = sqliteTable(
 );
 
 // ページ付箋コメント
-export const pageComments = sqliteTable("page_comments", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  type: text("type").notNull(),
-  content: text("content").notNull(),
-  createdAt: text("created_at").default(sql`(datetime('now'))`),
-});
+export const pageComments = sqliteTable(
+  "page_comments",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    type: text("type").notNull(),
+    content: text("content").notNull(),
+    createdAt: text("created_at").default(sql`(datetime('now'))`),
+  },
+  (table) => [
+    // trend.astro: orderBy(desc(createdAt))
+    index("page_comments_created_at_idx").on(table.createdAt),
+  ],
+);
