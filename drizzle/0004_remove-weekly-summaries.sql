@@ -1,1 +1,1 @@
-DROP TABLE `weekly_summaries`;
+DROP TABLE IF EXISTS `weekly_summaries`;
