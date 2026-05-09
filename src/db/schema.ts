@@ -50,24 +50,6 @@ export const repoStats = sqliteTable(
   (table) => [index("repo_stats_repo_idx").on(table.repo)],
 );
 
-// リリース
-export const releases = sqliteTable(
-  "releases",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    repo: text("repo").notNull(),
-    tag: text("tag").notNull(),
-    version: text("version").notNull(),
-    type: text("type").notNull(),
-    publishedAt: text("published_at").notNull(),
-    createdAt: text("created_at").default(sql`(datetime('now'))`),
-    updatedAt: text("updated_at"),
-  },
-  (table) => [
-    uniqueIndex("releases_repo_tag_unique").on(table.repo, table.tag),
-  ],
-);
-
 // LLMモデル共通カラム（現在テーブルと履歴テーブルで共有）
 const llmModelDataColumns = {
   modelName: text("model_name").notNull(),

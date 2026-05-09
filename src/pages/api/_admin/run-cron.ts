@@ -1,4 +1,4 @@
-// POST /api/_admin/run-cron?name=<articles|releases|repos>
+// POST /api/_admin/run-cron?name=<articles|repos>
 // 開発・障害復旧用の手動 cron トリガー。X-Admin-Secret ヘッダー認証 (= INGEST_API_KEY と同じ値)。
 // 通常運用では Cloudflare Cron Triggers が自動発火するので不要。
 
@@ -8,10 +8,6 @@ import {
   type DailyArticlesEnv,
   runDailyArticles,
 } from "../../../lib/cron/daily-articles";
-import {
-  type DailyReleasesEnv,
-  runDailyReleases,
-} from "../../../lib/cron/daily-releases";
 import {
   type DailyReposEnv,
   runDailyRepos,
@@ -43,9 +39,6 @@ export const POST: APIRoute = async ({ request, url }) => {
       case "articles":
         await runDailyArticles(env as unknown as DailyArticlesEnv);
         break;
-      case "releases":
-        await runDailyReleases(env as unknown as DailyReleasesEnv);
-        break;
       case "repos":
         await runDailyRepos(env as unknown as DailyReposEnv);
         break;
@@ -53,7 +46,7 @@ export const POST: APIRoute = async ({ request, url }) => {
         return new Response(
           JSON.stringify({
             ok: false,
-            error: "Invalid name. Use one of: articles, releases, repos",
+            error: "Invalid name. Use one of: articles, repos",
           }),
           { status: 400, headers: { "Content-Type": "application/json" } },
         );

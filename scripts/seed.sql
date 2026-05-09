@@ -96,22 +96,6 @@ INSERT OR REPLACE INTO repo_stats (repo, stars, created_at) VALUES
   ('modelcontextprotocol/servers',  80210, '2026-03-06');
 
 -- ============================================================
--- releases  (security.html > #tab-updates > .update-card, 全10件)
--- type: update-bar-minor → 'minor', update-bar-major → 'major'
--- ============================================================
-INSERT OR REPLACE INTO releases (repo, tag, version, type, published_at) VALUES
-  ('tensorflow/tensorflow',    'v2.21.0',  '2.21.0',  'minor', '2026-03-06'),
-  ('huggingface/transformers', 'v5.3.0',   '5.3.0',   'minor', '2026-03-04'),
-  ('langflow-ai/langflow',     'v1.8.0',   '1.8.0',   'minor', '2026-03-05'),
-  ('electron/electron',        'v40.8.0',  '40.8.0',  'minor', '2026-03-05'),
-  ('nodejs/node',              'v25.8.0',  '25.8.0',  'minor', '2026-03-03'),
-  ('rust-lang/rust',           '1.94.0',   '1.94.0',  'minor', '2026-03-05'),
-  ('shadcn-ui/ui',             'v4.0.0',   '4.0.0',   'major', '2026-03-06'),
-  ('comfyanonymous/ComfyUI',   'v0.16.0',  '0.16.0',  'minor', '2026-03-05'),
-  ('home-assistant/core',      '2026.3.0', '2026.3.0','minor', '2026-03-04'),
-  ('louislam/uptime-kuma',     'v2.2.0',   '2.2.0',   'minor', '2026-03-05');
-
--- ============================================================
 -- llm_models  (ai-compare.html > #api-tbody, 全56件)
 -- score: ELO スコア（bench-score）
 -- currency: USD

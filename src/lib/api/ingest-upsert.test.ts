@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { releases, repoStats, trackingRepos } from "../../db/schema";
+import { repoStats, trackingRepos } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
 import {
   getTrackingRepos,
-  processReleases,
   processRepoRenames,
   processTrackingRepos,
 } from "./ingest-upsert";
@@ -14,53 +13,6 @@ let db: TestDb;
 beforeEach(() => {
   const t = createTestDbWithTables();
   db = t.db;
-});
-
-describe("processReleases", () => {
-  const validRelease = {
-    repo: "facebook/react",
-    tag: "v19.0.0",
-    version: "19.0.0",
-    type: "major" as const,
-    publishedAt: "2026-03-15",
-  };
-
-  it("リリースを INSERT できる", async () => {
-    const result = await processReleases(db, [validRelease]);
-    expect(result.inserted).toBe(1);
-  });
-
-  it("repo+tag 重複はスキップ", async () => {
-    await processReleases(db, [validRelease]);
-    const result = await processReleases(db, [validRelease]);
-    expect(result.inserted).toBe(0);
-    const rows = await db.select().from(releases);
-    expect(rows).toHaveLength(1);
-  });
-
-  it("同じリポの別タグは INSERT される", async () => {
-    await processReleases(db, [validRelease]);
-    const result = await processReleases(db, [
-      { ...validRelease, tag: "v19.1.0", version: "19.1.0", type: "minor" },
-    ]);
-    expect(result.inserted).toBe(1);
-    const rows = await db.select().from(releases);
-    expect(rows).toHaveLength(2);
-  });
-
-  it("チャンクサイズ超過（50件）でも全件 INSERT できる", async () => {
-    const batch = Array.from({ length: 50 }, (_, i) => ({
-      repo: `owner/repo-${i}`,
-      tag: `v1.0.${i}`,
-      version: `1.0.${i}`,
-      type: "minor" as const,
-      publishedAt: "2026-04-24",
-    }));
-    const result = await processReleases(db, batch);
-    expect(result.inserted).toBe(50);
-    const rows = await db.select().from(releases);
-    expect(rows).toHaveLength(50);
-  });
 });
 
 describe("processTrackingRepos", () => {

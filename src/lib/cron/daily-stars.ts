@@ -6,7 +6,7 @@ import { buildStarBatches, type StarBatch } from "./build-star-batches";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
-// 5xx (GitHub / CF egress proxy 一時障害) を吸収する retry。 daily-releases.ts と
+// 5xx (GitHub / CF egress proxy 一時障害) を吸収する retry。 daily-repos.ts と
 // 同等の policy。 5/7 検証で本番 cron context で連続 5xx 死亡を確認したため、
 // MAX_ATTEMPTS を 5 に増やし exponential backoff で max 30s 待つ。
 const MAX_ATTEMPTS = 5;
@@ -219,7 +219,7 @@ export async function pingHealthchecks(
  * GitHub の rename 検出結果を tracking_repos に反映する。
  *
  * 設計判断 (#net-task: rename 反映):
- * - tracking_repos のみ UPDATE。repo_stats / releases は旧名で履歴を残す
+ * - tracking_repos のみ UPDATE。repo_stats は旧名で履歴を残す
  *   （次回 cron 以降は新名で蓄積される）。
  * - UNIQUE 制約衝突 (新名 row が既存) なら旧名を DELETE（孤児）。GitHub 側で
  *   既に新名 repository が存在するケース。
@@ -376,7 +376,7 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }
   }
 
-  // 4.5. rename 適用（tracking_repos のみ UPDATE。repo_stats / releases は履歴保持）
+  // 4.5. rename 適用（tracking_repos のみ UPDATE。repo_stats は履歴保持）
   const renameResult = await queryD1(
     "daily_stars.tracking_repos.rename_apply",
     () => applyRenames(db, allRenames, dryRun),
