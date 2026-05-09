@@ -5,7 +5,6 @@ import {
   llmModelHistory,
   llmModels,
   pageComments,
-  releases,
   repoStats,
   subscriptionPlanHistory,
   subscriptionPlans,
@@ -224,23 +223,6 @@ describe("pageComments", () => {
 
     expect(rows).toHaveLength(1);
     expect(rows[0].content).toBe("新しいコメント");
-  });
-});
-
-describe("releases", () => {
-  it("repo+tagのUNIQUE制約が効く", async () => {
-    const release = {
-      repo: "facebook/react",
-      tag: "v19.0.0",
-      version: "19.0.0",
-      type: "major",
-      publishedAt: "2026-03-10",
-    };
-
-    await db.insert(releases).values(release);
-    await expect(
-      db.insert(releases).values({ ...release, version: "19.0.1" }),
-    ).rejects.toThrow();
   });
 });
 

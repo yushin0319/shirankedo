@@ -71,22 +71,6 @@ INSERT INTO repo_stats (repo, stars, created_at) VALUES
 ('sveltejs/svelte', 82000, '2026-03-11'),('sveltejs/svelte', 82200, '2026-03-18'),
 ('vuejs/core', 48000, '2026-03-11'),('vuejs/core', 48100, '2026-03-18');
 
--- releases（13件、うち2件がmajor）
-INSERT INTO releases (repo, tag, version, type, published_at) VALUES
-('vercel/next.js', 'v15.0.0', '15.0.0', 'major', '2026-03-18'),
-('denoland/deno', 'v2.0.0', '2.0.0', 'major', '2026-03-17'),
-('astral-sh/uv', 'v0.8.1', '0.8.1', 'minor', '2026-03-17'),
-('oven-sh/bun', 'v1.3.2', '1.3.2', 'minor', '2026-03-16'),
-('tailwindlabs/tailwindcss', 'v4.2.2', '4.2.2', 'minor', '2026-03-16'),
-('biomejs/biome', 'v2.4.8', '2.4.8', 'minor', '2026-03-15'),
-('drizzle-team/drizzle-orm', 'v0.46.0', '0.46.0', 'minor', '2026-03-15'),
-('cloudflare/workers-sdk', 'v4.74.0', '4.74.0', 'minor', '2026-03-14'),
-('anthropics/claude-code', 'v1.2.0', '1.2.0', 'minor', '2026-03-14'),
-('openai/codex', 'v0.5.0', '0.5.0', 'minor', '2026-03-13'),
-('facebook/react', 'v19.2.5', '19.2.5', 'minor', '2026-03-13'),
-('sveltejs/svelte', 'v5.3.0', '5.3.0', 'minor', '2026-03-12'),
-('vuejs/core', 'v3.6.1', '3.6.1', 'minor', '2026-03-12');
-
 -- page_comments（付箋コメント）
 INSERT INTO page_comments (type, content) VALUES
 ('ai_api', 'Gemini 3.1 ProがGPT-5.4を僅差で上回ってスコアトップに。コスパではDeepSeek V4が圧倒的。'),

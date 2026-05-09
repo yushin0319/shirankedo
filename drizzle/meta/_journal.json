@@ -36,6 +36,13 @@
       "when": 1778243291551,
       "tag": "0004_remove-weekly-summaries",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1778301564914,
+      "tag": "0005_remove-releases",
+      "breakpoints": true
     }
   ]
 }

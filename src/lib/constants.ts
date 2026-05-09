@@ -15,9 +15,6 @@ export const TREND_DIFF_WINDOW_HOURS = 7 * 24 + 5; // 173時間
 /** スコア時間減衰率（1日あたり15%減衰） */
 export const DECAY_RATE = 0.85;
 
-/** メジャーリリースのスコア倍率 */
-export const MAJOR_RELEASE_MULTIPLIER = 2;
-
 /** 「もっと見る」のページング単位 */
 export const PAGE_STEP = 10;
 

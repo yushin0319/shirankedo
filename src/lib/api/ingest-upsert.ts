@@ -1,47 +1,16 @@
-// UPSERT 系のロジック（releases, tracking-repos）
+// UPSERT 系のロジック（tracking-repos）
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import type { AppDatabase } from "../../db/client";
-import { releases, repoStats, trackingRepos } from "../../db/schema";
+import { repoStats, trackingRepos } from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
-import { releaseSchema, repoRenameSchema, trackingRepoSchema } from "./schemas";
+import { repoRenameSchema, trackingRepoSchema } from "./schemas";
 
-// D1 は 1 prepared statement あたり最大 100 bound parameter。 releases/trackingRepos
+// D1 は 1 prepared statement あたり最大 100 bound parameter。 trackingRepos
 // は INSERT 列数 6 のため 50 件 × 6 = 300 は超過するが、 16 件以下なら 16 × 6 = 96
 // < 100 で確実に safe。 daily 実 INSERT は最大 100 件程度なので chunk 数 7 でも
 // subrequest 50 limit 内余裕。
 const INSERT_CHUNK_SIZE = 16;
-
-/** releases: INSERT（repo+tag 重複スキップ） */
-export async function processReleases(
-  db: AppDatabase,
-  data: unknown[],
-): Promise<{ inserted: number }> {
-  if (data.length === 0) return { inserted: 0 };
-  const parsed = z.array(releaseSchema).parse(data);
-
-  // 既存の repo+tag ペアを取得
-  const repos = [...new Set(parsed.map((r) => r.repo))];
-  const existing = await queryD1("releases.existing", () =>
-    db
-      .select({ repo: releases.repo, tag: releases.tag })
-      .from(releases)
-      .where(inArray(releases.repo, repos)),
-  );
-  const existingKeys = new Set(existing.map((r) => `${r.repo}:${r.tag}`));
-
-  const newItems = parsed.filter(
-    (r) => !existingKeys.has(`${r.repo}:${r.tag}`),
-  );
-  if (newItems.length === 0) return { inserted: 0 };
-
-  for (let i = 0; i < newItems.length; i += INSERT_CHUNK_SIZE) {
-    await queryD1("releases.insert_chunk", () =>
-      db.insert(releases).values(newItems.slice(i, i + INSERT_CHUNK_SIZE)),
-    );
-  }
-  return { inserted: newItems.length };
-}
 
 /** tracking-repos: UPSERT */
 export async function processTrackingRepos(

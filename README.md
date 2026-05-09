@@ -32,7 +32,7 @@
 |---|---|
 | 記事 | `articles` / `articles/recent` / `articles/urls` |
 | トレンド | `trend-ranking` / `tracking-repos` / `repo-stats` / `repo-renames` |
-| 参考データ | `releases` / `llm-models` / `subscription-plans` / `exchange-rate` / `page-comments` |
+| 参考データ | `llm-models` / `subscription-plans` / `exchange-rate` / `page-comments` |
 
 レート制限: `/api/ingest/**` 全体で **60 req/min/path**（KV ベース、TTL 120s、超過は 429 + `Retry-After: 60`）。
 

@@ -17,15 +17,6 @@ export const articleSchema = z.object({
 /** 記事配列（POST /api/ingest/articles のリクエストボディ） */
 export const dailyArticlesSchema = z.array(articleSchema);
 
-/** リリース */
-export const releaseSchema = z.object({
-  repo: z.string().min(1),
-  tag: z.string().min(1),
-  version: z.string().min(1),
-  type: z.enum(["major", "minor"]),
-  publishedAt: z.string().min(1),
-});
-
 /** 追跡リポジトリ */
 export const trackingRepoSchema = z.object({
   repo: z.string().min(1),

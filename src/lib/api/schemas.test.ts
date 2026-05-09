@@ -4,7 +4,6 @@ import {
   dailyArticlesSchema,
   llmModelSchema,
   pageCommentSchema,
-  releaseSchema,
   repoStatSchema,
   subscriptionPlanSchema,
   trackingRepoSchema,
@@ -77,30 +76,6 @@ describe("dailyArticlesSchema", () => {
       },
     ]);
     expect(result.success).toBe(true);
-  });
-});
-
-describe("releaseSchema", () => {
-  it("有効なデータをパースできる", () => {
-    const result = releaseSchema.safeParse({
-      repo: "facebook/react",
-      tag: "v19.0.0",
-      version: "19.0.0",
-      type: "major",
-      publishedAt: "2026-03-15",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("type が major/minor 以外でエラー", () => {
-    const result = releaseSchema.safeParse({
-      repo: "facebook/react",
-      tag: "v19.0.0",
-      version: "19.0.0",
-      type: "patch",
-      publishedAt: "2026-03-15",
-    });
-    expect(result.success).toBe(false);
   });
 });
 
