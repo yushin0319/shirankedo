@@ -24,10 +24,6 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run build
       - name: Apply D1 migrations (remote)
-        # NOTE: 現状 CLOUDFLARE_API_TOKEN に D1 Edit 権限がなく code: 7403 で失敗する。
-        # 暫定で skip 化。手動適用は cf-d1-query.sh または `wrangler d1 migrations apply` で実施。
-        # token に D1 Edit 権限を付与した後に `if:` を外して有効化すること。
-        if: false
         run: bunx wrangler d1 migrations apply shirankedo --remote
       - name: wrangler deploy (with Sentry release tag)
         run: bunx wrangler deploy --var SENTRY_RELEASE:${{ github.sha }}
