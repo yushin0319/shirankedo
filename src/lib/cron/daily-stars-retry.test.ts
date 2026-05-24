@@ -60,7 +60,7 @@ describe("fetchBatch retry", () => {
     expect(fetchSpy).toHaveBeenCalledTimes(5);
   }, 60000);
 
-  it("4xx は retry せず即 throw", async () => {
+  it("401 (非 retry 4xx) は retry せず即 throw", async () => {
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(new Response("unauthorized", { status: 401 }));
@@ -70,4 +70,42 @@ describe("fetchBatch retry", () => {
     );
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("403 (secondary rate limit) → 200 で retry が効いて成功する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("rate limited", { status: 403 }))
+      .mockResolvedValueOnce(
+        successResponse({
+          data: {
+            r0: { nameWithOwner: "facebook/react", stargazerCount: 100 },
+          },
+        }),
+      );
+
+    const promise = fetchBatch(dummyBatch, "TOKEN");
+    // 403 は 60s 固定 sleep
+    await vi.advanceTimersByTimeAsync(61000);
+    const result = await promise;
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(result.stars).toEqual([{ repo: "facebook/react", stars: 100 }]);
+  }, 60000);
+
+  it("403 が MAX_ATTEMPTS まで続けば (after N attempts) で throw", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response("rate limited", { status: 403 }));
+
+    const promise = fetchBatch(dummyBatch, "TOKEN");
+    const expectation = expect(promise).rejects.toThrow(
+      /GitHub GraphQL HTTP 403 batch=0 \(after 5 attempts\)/,
+    );
+    // 60s x 4 retry = 240s
+    await vi.advanceTimersByTimeAsync(250000);
+    await expectation;
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
+  }, 60000);
 });

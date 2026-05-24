@@ -99,16 +99,24 @@ export async function fetchBatch(
       );
     }
     if (res.ok) break;
-    // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり
-    if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
-      // 5/7 検証 3rd: exponential は wall time 圧迫で silent kill 原因。
-      // linear (累計 10s) に戻す。 MAX_ATTEMPTS=5 は 504 吸収のため維持。
-      const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
+    // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり。
+    // 403 は GitHub GraphQL secondary rate limit (abuse detection)、
+    // 連続 POST で抵触し数分待てば回復するので長めに sleep して retry。
+    // 5/23 batch=9 / 5/24 batch=16 で `after 1 attempts` の連続失敗の対策。
+    const isRateLimit = res.status === 403;
+    const isServerError = res.status >= 500;
+    if ((isServerError || isRateLimit) && attempt < MAX_ATTEMPTS) {
+      // 5xx は linear (累計 10s)、 secondary rate limit は 60s 固定で待つ
+      // (GitHub の secondary limit は数分単位で解除されるため短時間 retry は無駄)。
+      const sleepMs = isRateLimit
+        ? 60000
+        : Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
       console.log(
         JSON.stringify({
           type: "graphql_retry",
           batch: batch.batchIndex,
           status: res.status,
+          reason: isRateLimit ? "secondary_rate_limit" : "5xx",
           attempt,
           sleep_ms: sleepMs,
         }),
