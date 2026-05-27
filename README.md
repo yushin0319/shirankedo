@@ -63,13 +63,19 @@ post-deploy smoke test（5 ページの 200 OK 確認）が走り、失敗時は
 ## データフロー
 
 ```
-n8n cron (日次 0:00 JST / 週次 月曜 3:00 JST)
-  ↓ POST /api/ingest/{articles,trend-ranking,page-comments,...}
+Cloudflare Workers scheduled handler (3 cron: 00:00 / 00:05 / 00:10 JST = 15:00/05/10 UTC)
+  ├─ daily-articles  : RSS 取得 → Gemini 要約 → D1 upsert
+  ├─ daily-stars     : 注目リポ星数集計 → D1
+  └─ daily-repos     : リポ統計（rename / forks 等）→ D1
+n8n cron (週次・補助系)
+  ↓ POST /api/ingest/{trend-ranking,page-comments,llm-models,subscription-plans,exchange-rate,...}
   ↓ X-API-Key 認証 + Zod バリデーション + upsert
 Cloudflare D1 (shirankedo)
   ↓ SSR
 Astro + React Islands → Cloudflare Workers → ユーザー
 ```
+
+Worker scheduled handler の失敗は `notifyObs(severity=warning)` で obs-notify 経由 Discord + 観測性 DB に通知（PR #137 / #158 で二重保険化）。
 
 ## 運用ルール
 
