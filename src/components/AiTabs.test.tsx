@@ -175,7 +175,7 @@ describe("AiTabs", () => {
         {
           id: 1,
           provider: "Mistral",
-          service: "Le Chat",
+          service: "Vibe",
           planName: "Pro",
           price: 14.99,
           currency: "EUR",
