@@ -2,20 +2,22 @@
 -- 各テーブル13件以上で「もっと見る」ボタンのテストを可能にする
 
 -- articles（13件、タグ2種以上）
+-- published_at は index.astro の 45日窓フィルタ(QUERY_WINDOW_DAYS)に合わせ date('now') 相対で生成。
+-- 固定日付だと窓外になり記事が表示されず e2e が落ちるため。impact と日付の大小関係は維持し decay 順は不変。
 INSERT INTO articles (url, title, source, summary, comment, tags, impact, is_paper, published_at) VALUES
-('https://example.com/1', 'AIモデルの新時代', 'TechNews', 'AI要約1', 'コメント1', '["AI","機械学習"]', 90, 0, '2026-03-18'),
-('https://example.com/2', 'セキュリティの最前線', 'SecNews', 'セキュリティ要約2', 'コメント2', '["セキュリティ"]', 85, 0, '2026-03-18'),
-('https://example.com/3', 'Rustの未来', 'DevBlog', 'Rust要約3', 'コメント3', '["開発ツール"]', 80, 0, '2026-03-17'),
-('https://example.com/4', 'LLM比較レポート', 'ArXiv', 'LLM要約4', 'コメント4', '["AI","論文"]', 78, 1, '2026-03-17'),
-('https://example.com/5', 'クラウドの進化', 'CloudWatch', 'クラウド要約5', 'コメント5', '["クラウド"]', 75, 0, '2026-03-16'),
-('https://example.com/6', 'TypeScript 6.0', 'MSBlog', 'TS要約6', 'コメント6', '["開発ツール"]', 73, 0, '2026-03-16'),
-('https://example.com/7', 'ゼロデイ脆弱性', 'SecNews', 'ゼロデイ要約7', 'コメント7', '["セキュリティ"]', 70, 0, '2026-03-15'),
-('https://example.com/8', 'GPUの性能向上', 'HWNews', 'GPU要約8', 'コメント8', '["ハードウェア"]', 68, 0, '2026-03-15'),
-('https://example.com/9', 'OSS資金調達', 'OSSWatch', 'OSS要約9', 'コメント9', '["OSS"]', 65, 0, '2026-03-14'),
-('https://example.com/10', 'WebAssemblyの進化', 'WebDev', 'Wasm要約10', 'コメント10', '["開発ツール"]', 63, 0, '2026-03-14'),
-('https://example.com/11', 'Kubernetes 2.0', 'CNCF', 'K8s要約11', 'コメント11', '["クラウド"]', 60, 0, '2026-03-13'),
-('https://example.com/12', 'AIエージェント最新動向', 'AIWeekly', 'エージェント要約12', 'コメント12', '["AI"]', 58, 0, '2026-03-13'),
-('https://example.com/13', 'データベース比較2026', 'DBTrends', 'DB要約13', 'コメント13', '["開発ツール"]', 55, 0, '2026-03-12');
+('https://example.com/1', 'AIモデルの新時代', 'TechNews', 'AI要約1', 'コメント1', '["AI","機械学習"]', 90, 0, date('now','-2 days')),
+('https://example.com/2', 'セキュリティの最前線', 'SecNews', 'セキュリティ要約2', 'コメント2', '["セキュリティ"]', 85, 0, date('now','-2 days')),
+('https://example.com/3', 'Rustの未来', 'DevBlog', 'Rust要約3', 'コメント3', '["開発ツール"]', 80, 0, date('now','-3 days')),
+('https://example.com/4', 'LLM比較レポート', 'ArXiv', 'LLM要約4', 'コメント4', '["AI","論文"]', 78, 1, date('now','-3 days')),
+('https://example.com/5', 'クラウドの進化', 'CloudWatch', 'クラウド要約5', 'コメント5', '["クラウド"]', 75, 0, date('now','-4 days')),
+('https://example.com/6', 'TypeScript 6.0', 'MSBlog', 'TS要約6', 'コメント6', '["開発ツール"]', 73, 0, date('now','-4 days')),
+('https://example.com/7', 'ゼロデイ脆弱性', 'SecNews', 'ゼロデイ要約7', 'コメント7', '["セキュリティ"]', 70, 0, date('now','-5 days')),
+('https://example.com/8', 'GPUの性能向上', 'HWNews', 'GPU要約8', 'コメント8', '["ハードウェア"]', 68, 0, date('now','-5 days')),
+('https://example.com/9', 'OSS資金調達', 'OSSWatch', 'OSS要約9', 'コメント9', '["OSS"]', 65, 0, date('now','-6 days')),
+('https://example.com/10', 'WebAssemblyの進化', 'WebDev', 'Wasm要約10', 'コメント10', '["開発ツール"]', 63, 0, date('now','-6 days')),
+('https://example.com/11', 'Kubernetes 2.0', 'CNCF', 'K8s要約11', 'コメント11', '["クラウド"]', 60, 0, date('now','-7 days')),
+('https://example.com/12', 'AIエージェント最新動向', 'AIWeekly', 'エージェント要約12', 'コメント12', '["AI"]', 58, 0, date('now','-7 days')),
+('https://example.com/13', 'データベース比較2026', 'DBTrends', 'DB要約13', 'コメント13', '["開発ツール"]', 55, 0, date('now','-8 days'));
 
 -- llm_models（13件）
 INSERT INTO llm_models (model_name, provider, score, input_price, output_price, currency) VALUES
