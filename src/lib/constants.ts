@@ -21,6 +21,14 @@ export const PAGE_STEP = 10;
 /** サーバー側データ取得の上限件数 */
 export const FETCH_LIMIT = 50;
 
+/**
+ * トップページで D1 から取得する記事の母集団上限。
+ * decayScore は 15%/日 減衰（0.85^days）のため、上位 FETCH_LIMIT 件は
+ * publishedAt 降順の直近この件数に必ず含まれる。全件 SELECT による
+ * fetch ハンドラの CPU 超過（exceededCpu）を防ぐためのガード。
+ */
+export const QUERY_LIMIT = 300;
+
 /** フロント表示の上限件数（これ以上は「もっと見る」を出さない） */
 export const DISPLAY_CAP = 100;
 
