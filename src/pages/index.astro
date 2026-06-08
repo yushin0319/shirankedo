@@ -1,12 +1,13 @@
 ---
 import { env } from "cloudflare:workers";
+import { desc, sql } from "drizzle-orm";
 import Layout from "../layouts/Layout.astro";
 import NewsCard from "../components/NewsCard.astro";
 import { getDb } from "../db/client";
 import { articles } from "../db/schema";
 import { formatDisplayDate } from "../lib/date";
 import { topArticles } from "../lib/articles";
-import { FETCH_LIMIT } from "../lib/constants";
+import { FETCH_LIMIT, QUERY_LIMIT, QUERY_WINDOW_DAYS } from "../lib/constants";
 import { queryD1 } from "../lib/d1-wrapper";
 
 let rows: any[] = [];
@@ -14,8 +15,18 @@ let fetchError = false;
 
 try {
 	const db = getDb(env.DB);
-	const allRows = await queryD1("articles.all", () =>
-		db.select().from(articles),
+	// 全件取得は記事増加で fetch ハンドラの CPU 超過(exceededCpu)を招くため母集団を絞る。
+	// QUERY_WINDOW_DAYS より古い記事は decay でスコアが実質ゼロになり上位 FETCH_LIMIT 件に
+	// 入り得ない(漏れ防止の明示ガード)。さらに QUERY_LIMIT で CPU 上限を保証する。
+	const allRows = await queryD1("articles.recent", () =>
+		db
+			.select()
+			.from(articles)
+			.where(
+				sql`${articles.publishedAt} >= date('now', ${`-${QUERY_WINDOW_DAYS} days`})`,
+			)
+			.orderBy(desc(articles.publishedAt))
+			.limit(QUERY_LIMIT),
 	);
 	const now = new Date();
 	rows = topArticles(allRows, FETCH_LIMIT, now);

@@ -21,6 +21,23 @@ export const PAGE_STEP = 10;
 /** サーバー側データ取得の上限件数 */
 export const FETCH_LIMIT = 50;
 
+/**
+ * トップページで D1 から取得する記事の母集団上限（CPU 上限ガード）。
+ * 全件 SELECT は記事増加で fetch ハンドラの CPU 枠を超過し exceededCpu に
+ * なるため上限を設ける。impact は 4〜10 に収まり decayScore=impact×0.85^days。
+ * 上位 FETCH_LIMIT(50) 件に入るには impact 最大10でも約10日以内が必要
+ * （10×0.85^10≈1.97 が表示下限付近）。QUERY_WINDOW_DAYS と併用し漏れを防ぐ。
+ */
+export const QUERY_LIMIT = 300;
+
+/**
+ * トップページの記事取得対象期間（日数）。これより古い記事は decay でスコアが
+ * 実質ゼロ（impact最大10×0.85^45 ≈ 0.007 ≪ 上位50件の最小スコア 1.9 前後）に
+ * なり top FETCH_LIMIT 件へ入り得ないため除外する。decay 漏れ防止の明示ガード兼、
+ * 母集団を絞って CPU を削減する。記事頻度が将来増えても日数固定で安全側に働く。
+ */
+export const QUERY_WINDOW_DAYS = 45;
+
 /** フロント表示の上限件数（これ以上は「もっと見る」を出さない） */
 export const DISPLAY_CAP = 100;
 
