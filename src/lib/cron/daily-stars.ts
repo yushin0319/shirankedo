@@ -103,11 +103,19 @@ export async function fetchBatch(
     // 403 は GitHub GraphQL secondary rate limit (abuse detection)、
     // 連続 POST で抵触し数分待てば回復するので長めに sleep して retry。
     // 5/23 batch=9 / 5/24 batch=16 で `after 1 attempts` の連続失敗の対策。
+    // 401 は token が有効でも GitHub が高負荷/abuse 検知時に 403 でなく 401 を
+    // 返すケースがある (6/10 batch=18、batch 0-17 は認証成功 → 失効ではない)。
+    // 一過性なので retry 対象に含めるが、複数 batch で連発しても cron の 15 分枠を
+    // 食い潰さないよう wait は 60s 固定ではなく 5xx 同様 linear backoff にする。
     const isRateLimit = res.status === 403;
+    const isTransientAuth = res.status === 401;
     const isServerError = res.status >= 500;
-    if ((isServerError || isRateLimit) && attempt < MAX_ATTEMPTS) {
-      // 5xx は linear (累計 10s)、 secondary rate limit は 60s 固定で待つ
-      // (GitHub の secondary limit は数分単位で解除されるため短時間 retry は無駄)。
+    if (
+      (isServerError || isRateLimit || isTransientAuth) &&
+      attempt < MAX_ATTEMPTS
+    ) {
+      // secondary rate limit は 60s 固定で待つ (GitHub の secondary limit は
+      // 数分単位で解除されるため短時間 retry は無駄)。5xx / 401 は linear (累計 10s)。
       const sleepMs = isRateLimit
         ? 60000
         : Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
@@ -116,7 +124,11 @@ export async function fetchBatch(
           type: "graphql_retry",
           batch: batch.batchIndex,
           status: res.status,
-          reason: isRateLimit ? "secondary_rate_limit" : "5xx",
+          reason: isRateLimit
+            ? "secondary_rate_limit"
+            : isTransientAuth
+              ? "transient_auth"
+              : "5xx",
           attempt,
           sleep_ms: sleepMs,
         }),
@@ -351,14 +363,38 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
   // 3. 順次 fetch（GitHub secondary rate limit 回避のため間隔を空ける）
   const allStars: StarRow[] = [];
   const allRenames: RenameRow[] = [];
+  const failedBatches: number[] = [];
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
-    const result = await fetchBatch(batch, env.GITHUB_TOKEN);
-    allStars.push(...result.stars);
-    allRenames.push(...result.renames);
+    // retry を尽くしても落ちた 1 batch で全日データ (~2700件) を失わないよう、
+    // 該当 batch だけ skip して継続する (parse-fail 経路と同じ graceful 思想)。
+    // skip は後段の obs-notify warning で必ず表に出す (silent truncation 禁止)。
+    try {
+      const result = await fetchBatch(batch, env.GITHUB_TOKEN);
+      allStars.push(...result.stars);
+      allRenames.push(...result.renames);
+    } catch (e) {
+      failedBatches.push(batch.batchIndex);
+      console.log(
+        JSON.stringify({
+          type: "batch_skipped",
+          batch: batch.batchIndex,
+          error: String(e).substring(0, 200),
+        }),
+      );
+    }
     if (i < batches.length - 1) {
       await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
     }
+  }
+
+  // 全 batch が落ちたケース (例: token 失効 / GitHub 全断) は graceful skip で
+  // 握り潰さず従来どおり throw する。worker.ts の catch → logCronError +
+  // HC fail ping (DOWN 通知) に乗せ、部分欠損 (warning) と区別して loud に出す。
+  if (batches.length > 0 && failedBatches.length === batches.length) {
+    throw new Error(
+      `daily-stars: all ${batches.length} batches failed (GitHub auth/outage の疑い)`,
+    );
   }
 
   // 4. D1 bulk INSERT（dry-run 時はスキップ）
@@ -391,7 +427,10 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
   );
 
   const durationMs = Date.now() - start;
-  const summary = `daily-stars${dryRun ? " (dry-run)" : ""}: ${allStars.length} stars / ${allRenames.length} renames (applied=${renameResult.applied} skipped=${renameResult.skipped} errors=${renameResult.errors}) / ${(durationMs / 1000).toFixed(1)}s`;
+  const failedNote = failedBatches.length
+    ? ` / ⚠ skipped_batches=${failedBatches.length} (${failedBatches.join(",")})`
+    : "";
+  const summary = `daily-stars${dryRun ? " (dry-run)" : ""}: ${allStars.length} stars / ${allRenames.length} renames (applied=${renameResult.applied} skipped=${renameResult.skipped} errors=${renameResult.errors}) / ${(durationMs / 1000).toFixed(1)}s${failedNote}`;
   console.log(
     JSON.stringify({
       type: "daily_stars_done",
@@ -401,6 +440,7 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
       renames_applied: renameResult.applied,
       renames_skipped: renameResult.skipped,
       renames_errors: renameResult.errors,
+      skipped_batches: failedBatches.length,
       duration_ms: durationMs,
       dry_run: dryRun,
     }),
@@ -413,9 +453,14 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
       const lines = allRenames.slice(0, 10).map((r) => `- ${r.from} → ${r.to}`);
       summaryText += `\nリネーム検知 (適用 ${renameResult.applied} / 失敗 ${renameResult.errors}):\n${lines.join("\n")}`;
     }
+    // 一部 batch を skip した日は info で埋もれさせず warning に上げる
+    // (朝確認すべき部分欠損。全 batch 成功なら従来どおり info)。
+    const hasFailed = failedBatches.length > 0;
     const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: "info",
-      subject: `✅ shirankedo daily-stars 完了 (${allStars.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
+      severity: hasFailed ? "warning" : "info",
+      subject: hasFailed
+        ? `⚠ shirankedo daily-stars 部分欠損 (${allStars.length}件取得 / ${failedBatches.length} batch skip)`
+        : `✅ shirankedo daily-stars 完了 (${allStars.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
       summary: summaryText,
     });
     if (!r.ok) {
