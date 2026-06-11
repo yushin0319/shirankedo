@@ -1,6 +1,8 @@
-// POST /api/_admin/run-cron?name=<articles|repos|stars>
+// POST /api/admin/run-cron?name=<articles|repos|stars>
 // 開発・障害復旧用の手動 cron トリガー。X-Admin-Secret ヘッダー認証 (= INGEST_API_KEY と同じ値)。
 // 通常運用では Cloudflare Cron Triggers が自動発火するので不要。
+// 注意: ディレクトリ名は `admin` (アンダースコア無し)。Astro は `_` 始まりの
+// pages を routing から除外するため、`_admin` だと build されず 404 になる。
 
 import { env } from "cloudflare:workers";
 import type { APIRoute } from "astro";
