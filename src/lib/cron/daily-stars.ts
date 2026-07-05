@@ -3,14 +3,10 @@ import { getDb } from "../../db/client";
 import { repoStats, trackingRepos } from "../../db/schema";
 import { queryD1 } from "../d1-wrapper";
 import { buildStarBatches, type StarBatch } from "./build-star-batches";
+import { fetchWithRetry } from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
-// 5xx (GitHub / CF egress proxy 一時障害) を吸収する retry。 daily-repos.ts と
-// 同等の policy。 5/7 検証で本番 cron context で連続 5xx 死亡を確認したため、
-// MAX_ATTEMPTS を 5 に増やし exponential backoff で max 30s 待つ。
-const MAX_ATTEMPTS = 5;
-const RETRY_SLEEP_CAP_MS = 30000;
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /**
@@ -65,82 +61,21 @@ export async function fetchBatch(
   batch: StarBatch,
   token: string,
 ): Promise<BatchResult> {
-  let res: Response | null = null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    // 5/7 検証 4th: fetch hung 対策で 10s timeout
-    try {
-      res = await fetch(GH_GRAPHQL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "User-Agent": "shirankedo-daily-stars/1.0",
-        },
-        body: JSON.stringify({ query: batch.query }),
-        signal: AbortSignal.timeout(10000),
-      });
-    } catch (e) {
-      if (attempt < MAX_ATTEMPTS) {
-        const sleepMs = Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
-        console.log(
-          JSON.stringify({
-            type: "graphql_timeout",
-            batch: batch.batchIndex,
-            error: String(e).substring(0, 100),
-            attempt,
-            sleep_ms: sleepMs,
-          }),
-        );
-        await new Promise((r) => setTimeout(r, sleepMs));
-        continue;
-      }
-      throw new Error(
-        `GitHub GraphQL fetch failed batch=${batch.batchIndex} (after ${attempt} attempts): ${String(e).substring(0, 200)}`,
-      );
-    }
-    if (res.ok) break;
-    // 5xx は GitHub / CF egress proxy 一時障害、 retry 価値あり。
-    // 403 は GitHub GraphQL secondary rate limit (abuse detection)、
-    // 連続 POST で抵触し数分待てば回復するので長めに sleep して retry。
-    // 5/23 batch=9 / 5/24 batch=16 で `after 1 attempts` の連続失敗の対策。
-    // 401 は token が有効でも GitHub が高負荷/abuse 検知時に 403 でなく 401 を
-    // 返すケースがある (6/10 batch=18、batch 0-17 は認証成功 → 失効ではない)。
-    // 一過性なので retry 対象に含めるが、複数 batch で連発しても cron の 15 分枠を
-    // 食い潰さないよう wait は 60s 固定ではなく 5xx 同様 linear backoff にする。
-    const isRateLimit = res.status === 403;
-    const isTransientAuth = res.status === 401;
-    const isServerError = res.status >= 500;
-    if (
-      (isServerError || isRateLimit || isTransientAuth) &&
-      attempt < MAX_ATTEMPTS
-    ) {
-      // secondary rate limit は 60s 固定で待つ (GitHub の secondary limit は
-      // 数分単位で解除されるため短時間 retry は無駄)。5xx / 401 は linear (累計 10s)。
-      const sleepMs = isRateLimit
-        ? 60000
-        : Math.min(attempt * 1000, RETRY_SLEEP_CAP_MS);
-      console.log(
-        JSON.stringify({
-          type: "graphql_retry",
-          batch: batch.batchIndex,
-          status: res.status,
-          reason: isRateLimit
-            ? "secondary_rate_limit"
-            : isTransientAuth
-              ? "transient_auth"
-              : "5xx",
-          attempt,
-          sleep_ms: sleepMs,
-        }),
-      );
-      await new Promise((r) => setTimeout(r, sleepMs));
-      continue;
-    }
-    throw new Error(
-      `GitHub GraphQL HTTP ${res.status} batch=${batch.batchIndex} (after ${attempt} attempts)`,
-    );
-  }
-  if (!res) throw new Error("unreachable");
+  // retry policy は cron-shared.fetchWithRetry に集約 (3 cron 横断で共有)。
+  // 5xx / 403 secondary rate limit / 401 一過性 auth / timeout を吸収。
+  const res = await fetchWithRetry(
+    GH_GRAPHQL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        "User-Agent": "shirankedo-daily-stars/1.0",
+      },
+      body: JSON.stringify({ query: batch.query }),
+    },
+    { label: "GitHub GraphQL", context: `batch=${batch.batchIndex}` },
+  );
   // 5/7 検証 7th: response body 途中切断で SyntaxError → batch スキップで完走。
   let json: {
     data?: Record<
