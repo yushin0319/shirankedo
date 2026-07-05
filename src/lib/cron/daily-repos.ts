@@ -4,6 +4,7 @@ import { getTrackingRepos, processTrackingRepos } from "../api/ingest-upsert";
 import {
   buildGeminiRequest,
   callGemini,
+  fetchWithRetry,
   notifyObs,
   parseGeminiText,
   pingHealthchecks,
@@ -110,14 +111,18 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
   const seenRepos = new Set<string>();
 
   for (let i = 0; i < queryUrls.length; i++) {
-    const res = await fetch(queryUrls[i], {
-      headers: {
-        Authorization: `Bearer ${env.GITHUB_TOKEN}`,
-        "User-Agent": "shirankedo-daily-repos/1.0",
-        Accept: "application/vnd.github+json",
+    // retry を cron-shared に集約。従来は retry 皆無で単発 5xx/401 即死だった。
+    const res = await fetchWithRetry(
+      queryUrls[i],
+      {
+        headers: {
+          Authorization: `Bearer ${env.GITHUB_TOKEN}`,
+          "User-Agent": "shirankedo-daily-repos/1.0",
+          Accept: "application/vnd.github+json",
+        },
       },
-    });
-    if (!res.ok) throw new Error(`GitHub Search HTTP ${res.status} query=${i}`);
+      { label: "GitHub Search", context: `query=${i}` },
+    );
 
     const json = (await res.json()) as {
       items?: {

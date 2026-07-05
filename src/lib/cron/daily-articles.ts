@@ -4,6 +4,7 @@ import { getArticleUrls } from "../api/ingest-articles-read";
 import {
   buildGeminiRequest,
   callGemini,
+  fetchWithRetry,
   notifyObs,
   parseGeminiJson,
   pingHealthchecks,
@@ -180,10 +181,22 @@ export async function runDailyArticles(env: DailyArticlesEnv): Promise<void> {
   );
 
   // 1. 既存URL は D1 直接、RSS / ArXiv は外部 fetch を並列で
+  // feed 取得は軽量 retry (maxAttempts 2) + timeout でラップ。失敗した feed は
+  // allSettled + 下流の skip でグレースフルに除外 (従来の per-feed skip を維持)。
   const [existingRes, ...feedResults] = await Promise.allSettled([
     getArticleUrls(db),
-    ...RSS_SOURCES.map((s) => fetch(s.url)),
-    fetch(ARXIV_URL),
+    ...RSS_SOURCES.map((s) =>
+      fetchWithRetry(
+        s.url,
+        {},
+        { label: "RSS", context: s.source, maxAttempts: 2 },
+      ),
+    ),
+    fetchWithRetry(
+      ARXIV_URL,
+      {},
+      { label: "ArXiv", context: "arxiv", maxAttempts: 2 },
+    ),
   ]);
 
   if (existingRes.status === "rejected")

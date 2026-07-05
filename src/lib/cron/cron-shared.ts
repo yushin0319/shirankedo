@@ -21,6 +21,107 @@ export async function safeFetch(
   }
 }
 
+/**
+ * GitHub GraphQL / REST 等の外部 fetch を retry する共通ラッパ。
+ * daily-stars.ts の fetchBatch で確立した policy を 3 cron 横断で共有する。
+ *
+ * retry 対象: fetch 例外 (timeout 含む) / 5xx (GitHub / CF egress proxy 一時障害) /
+ * 403 (GitHub secondary rate limit) / 401 (高負荷時の一過性 auth、6/10 batch=18 実例)。
+ * wait: 403 は 60s 固定 (secondary limit は数分単位で解除、短時間 retry は無駄)。
+ * 5xx / 401 / timeout は linear backoff (attempt*1000ms, cap 30s、累計 ~10s) で
+ * 複数呼び出し連発でも cron の 15 分枠を食い潰さない。
+ *
+ * 成功 (res.ok) の Response を返す。retry を尽くしても失敗なら throw (呼び出し元で
+ * graceful-skip するかは各 cron の設計次第)。
+ */
+export interface FetchRetryOptions {
+  /** ログ / エラーメッセージの prefix (例: "GitHub GraphQL", "GitHub Search") */
+  label: string;
+  /** エラーメッセージ末尾 context (例: "batch=0", "query=3")。省略可 */
+  context?: string;
+  maxAttempts?: number;
+  /** fetch の AbortSignal.timeout (ms) */
+  timeoutMs?: number;
+  /** 403 secondary rate limit の固定待ち (ms) */
+  rateLimitWaitMs?: number;
+  /** linear backoff の上限 (ms) */
+  retrySleepCapMs?: number;
+}
+
+export async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  opts: FetchRetryOptions,
+): Promise<Response> {
+  const maxAttempts = opts.maxAttempts ?? 5;
+  const timeoutMs = opts.timeoutMs ?? 10000;
+  const rateLimitWaitMs = opts.rateLimitWaitMs ?? 60000;
+  const cap = opts.retrySleepCapMs ?? 30000;
+  const ctx = opts.context ? ` ${opts.context}` : "";
+  let res: Response | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+    } catch (e) {
+      if (attempt < maxAttempts) {
+        const sleepMs = Math.min(attempt * 1000, cap);
+        console.log(
+          JSON.stringify({
+            type: "fetch_timeout",
+            label: opts.label,
+            context: opts.context,
+            error: String(e).substring(0, 100),
+            attempt,
+            sleep_ms: sleepMs,
+          }),
+        );
+        await new Promise((r) => setTimeout(r, sleepMs));
+        continue;
+      }
+      throw new Error(
+        `${opts.label} fetch failed${ctx} (after ${attempt} attempts): ${String(e).substring(0, 200)}`,
+      );
+    }
+    if (res.ok) break;
+    const isRateLimit = res.status === 403;
+    const isTransientAuth = res.status === 401;
+    const isServerError = res.status >= 500;
+    if (
+      (isServerError || isRateLimit || isTransientAuth) &&
+      attempt < maxAttempts
+    ) {
+      const sleepMs = isRateLimit
+        ? rateLimitWaitMs
+        : Math.min(attempt * 1000, cap);
+      console.log(
+        JSON.stringify({
+          type: "fetch_retry",
+          label: opts.label,
+          context: opts.context,
+          status: res.status,
+          reason: isRateLimit
+            ? "secondary_rate_limit"
+            : isTransientAuth
+              ? "transient_auth"
+              : "5xx",
+          attempt,
+          sleep_ms: sleepMs,
+        }),
+      );
+      await new Promise((r) => setTimeout(r, sleepMs));
+      continue;
+    }
+    throw new Error(
+      `${opts.label} HTTP ${res.status}${ctx} (after ${attempt} attempts)`,
+    );
+  }
+  if (!res) throw new Error("unreachable");
+  return res;
+}
+
 /** obs-notify 経由で Discord + Notion 観測性 DB に通知 */
 export async function notifyObs(
   webhookSecret: string,
