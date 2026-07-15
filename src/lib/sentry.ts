@@ -16,7 +16,6 @@ import { Toucan } from "toucan-js";
 interface SentryEnv {
   SENTRY_DSN?: string;
   SENTRY_RELEASE?: string;
-  [key: string]: unknown;
 }
 
 export function createSentry(
