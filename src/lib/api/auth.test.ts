@@ -75,7 +75,7 @@ describe("safeJsonParse", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.response.status).toBe(400);
-      const body = await result.response.json();
+      const body = (await result.response.json()) as { error: string };
       expect(body.error).toBe("Invalid JSON");
     }
   });
