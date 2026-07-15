@@ -11,7 +11,7 @@
     "lint": "biome check .",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "dev:e2e": "astro dev",
+    "dev:e2e": "astro build && astro preview --port 4321",
     "licenses": "bunx license-checker-rseidelsohn --production --summary",
     "prepare": "husky"
   },
