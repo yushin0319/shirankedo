@@ -23,7 +23,7 @@
     "drizzle-orm": "^0.45.2",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
-    "tailwindcss": "^4.2.2",
+    "tailwindcss": "^4.3.3",
     "toucan-js": "^4.1.1",
     "zod": "^4.3.6"
   },
