@@ -7,7 +7,7 @@
 
 ## スタック
 
-- Astro 6 SSR + React 19 Islands（Cloudflare Workers adapter）
+- Astro 7 SSR + React 19 Islands（Cloudflare Workers adapter）
 - Tailwind CSS v4 / Zod / Drizzle ORM（D1）
 - Cloudflare D1（メイン DB、`shirankedo`）+ KV（キャッシュ・rate limit）
 - AI: Gemini 2.5 Flash（選定） + Gemini 3 Flash Preview（要約）
