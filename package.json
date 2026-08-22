@@ -43,7 +43,7 @@
     "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.10",
+    "vitest": "^4.1.11",
     "wrangler": "^4.124.0"
   },
   "overrides": {
