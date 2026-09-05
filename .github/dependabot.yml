@@ -5,3 +5,31 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    ignore:
+      # typescript の major 更新 (6 -> 7) を抑止する。
+      #
+      # 理由: TypeScript 7 (tsgo / Go ネイティブ実装) は programmatic API を
+      # パッケージの "." export から外しており (`npm view typescript@7.0.2 exports`
+      # の "." は ./lib/version.cjs = バージョン番号のみ)、`astro check` が依存する
+      # Language Service API を提供しない。@astrojs/language-server 2.16.16 では
+      # クラッシュではなく明示エラーで停止する:
+      #   "The TypeScript module loaded (found 7.0.2) does not expose the
+      #    programmatic API that `astro check` relies on."
+      #
+      # かつ、このリポジトリは tsc を直接呼ばない (build=astro build /
+      # test=vitest / lint=biome)。typescript パッケージの利用者は astro check
+      # だけなので、TS7 に上げても速度面の利点は無く、astro check が動かなくなる
+      # 分だけ損になる。
+      #
+      # これは Astro 固有ではなく、独自ファイル形式を持つツール共通の状況
+      # (svelte-check の peer も ^5.0.0 || ^6.0.0、Vue は
+      # vuejs/language-tools#5381 で追跡中)。
+      #
+      # 解除条件: withastro/roadmap#1321 (TypeScript Native 互換トラッキング) が
+      # 進み、TS7 で `bunx astro check` が通るようになったらこの ignore を外す。
+      # 判定は `bunx astro check` を TS7 で実行して上記メッセージが消えるか、
+      # または `npm view @astrojs/check peerDependencies` に ^7.0.0 が入るか。
+      #
+      # patch / minor (6.0.x) は従来どおり更新される。
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
