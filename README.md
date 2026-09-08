@@ -11,11 +11,12 @@
 - Tailwind CSS v4 / Zod / Drizzle ORM（D1）
 - Cloudflare D1（メイン DB、`shirankedo`）+ KV（キャッシュ・rate limit）
 - AI: Gemini 2.5 Flash（選定） + Gemini 3 Flash Preview（要約）
+- TypeScript 6 / Biome v2 / vitest v4（unit）+ Playwright（E2E）/ bun
 - 観測: Sentry (toucan-js) / observability-tail (tail_consumers) / Workers Observability
 
 ## 構成
 
-- `src/pages/*.astro` — SSR ページ（5 ページ）
+- `src/pages/*.astro` — SSR ページ（4 ページ: `/` / `/ai` / `/trend` / `/about`）
 - `src/pages/api/ingest/` — n8n からの ingest エンドポイント（後述）
 - `src/components/` — React Islands
 - `src/lib/` — `api/auth.ts`（X-API-Key 検証）、ingest ハンドラ
@@ -43,7 +44,8 @@
 ```bash
 bun install
 bun run dev        # 必須: wrangler dev は禁止（dist/ の古いビルドを配る）
-bun test
+bun run test       # vitest (unit)
+bun run test:e2e   # Playwright (E2E, 要 bun run dev:e2e)
 bun run build
 ```
 
@@ -58,7 +60,7 @@ bun run build
 bunx wrangler deploy
 ```
 
-post-deploy smoke test（5 ページの 200 OK 確認）が走り、失敗時は Discord に通知。
+post-deploy smoke test（`/` / `/ai` / `/trend` の 3 URL で 200 OK 確認）が走り、失敗時は Discord に通知。
 
 ## データフロー
 
