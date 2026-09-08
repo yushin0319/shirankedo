@@ -60,7 +60,7 @@ bun run build
 bunx wrangler deploy
 ```
 
-post-deploy smoke test（`/` / `/ai` / `/trend` の 3 URL で 200 OK 確認）が走り、失敗時は Discord に通知。
+post-deploy smoke test（`/` / `/ai` / `/trend` / `/about` の全 4 ページで 200 OK 確認）が走り、失敗時は Discord に通知。
 
 ## データフロー
 
