@@ -22,7 +22,7 @@
     "astro": "^7.3.2",
     "drizzle-orm": "^0.45.2",
     "react": "^19.3.0",
-    "react-dom": "^19.2.8",
+    "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "toucan-js": "^4.1.1",
     "zod": "^4.6.0"
