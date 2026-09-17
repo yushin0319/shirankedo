@@ -180,26 +180,76 @@ export function buildGeminiRequest(params: {
   });
 }
 
+export interface GeminiCallOptions {
+  /** 既定 1 (再試行なし)。429 / 5xx / fetch 例外のときだけ再試行する */
+  maxAttempts?: number;
+  /** 再試行前の待ち (ms)。524 (Cloudflare のタイムアウト) は即再送だと効かないので長めにする */
+  backoffMs?: number;
+}
+
 export async function callGemini(
   apiKey: string,
   model: string,
   body: string,
+  opts: GeminiCallOptions = {},
 ): Promise<GeminiResponseShape> {
-  const res = await fetch(
-    `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    },
-  );
-  if (!res.ok) {
+  const maxAttempts = opts.maxAttempts ?? 1;
+  const backoffMs = opts.backoffMs ?? 10000;
+  const suffix = (attempt: number) =>
+    maxAttempts > 1 ? ` (after ${attempt} attempts)` : "";
+  for (let attempt = 1; ; attempt++) {
+    const canRetry = attempt < maxAttempts;
+    let res: Response;
+    try {
+      res = await fetch(
+        `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body,
+        },
+      );
+    } catch (e: unknown) {
+      if (!canRetry) {
+        // 既定 (再試行なし) では従来どおり元の例外をそのまま投げる
+        if (maxAttempts === 1) throw e;
+        throw new Error(
+          `Gemini ${model} fetch failed${suffix(attempt)}: ${String(e).substring(0, 200)}`,
+        );
+      }
+      await waitGeminiRetry(model, attempt, backoffMs, String(e));
+      continue;
+    }
+    if (res.ok) return res.json() as Promise<GeminiResponseShape>;
+    if ((res.status === 429 || res.status >= 500) && canRetry) {
+      await waitGeminiRetry(model, attempt, backoffMs, `HTTP ${res.status}`);
+      continue;
+    }
     const text = await res.text().catch(() => "");
     throw new Error(
-      `Gemini ${model} HTTP ${res.status}: ${text.substring(0, 200)}`,
+      `Gemini ${model} HTTP ${res.status}: ${text.substring(0, 200)}${suffix(attempt)}`,
     );
   }
-  return res.json() as Promise<GeminiResponseShape>;
+}
+
+// ログは fetchWithRetry と同じ type: "fetch_retry" に揃える (cron の再送を 1 つの type で追えるように)。
+// fetchWithRetry 自体は GitHub 向け (403 を 60 秒待つ・429 は再試行しない・既定 10 秒で打ち切る) なので流用しない
+async function waitGeminiRetry(
+  model: string,
+  attempt: number,
+  backoffMs: number,
+  reason: string,
+): Promise<void> {
+  console.log(
+    JSON.stringify({
+      type: "fetch_retry",
+      label: `Gemini ${model}`,
+      reason: reason.substring(0, 100),
+      attempt,
+      sleep_ms: backoffMs,
+    }),
+  );
+  await new Promise((r) => setTimeout(r, backoffMs));
 }
 
 export function parseGeminiJson<T>(response: GeminiResponseShape): T {
