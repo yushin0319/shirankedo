@@ -332,10 +332,12 @@ JSONのみ出力してください。`;
   let geminiWarning: string | null = null;
   let selectionResult: SelectionResult = { articles: [] };
   try {
+    // 失敗するとその日の記事が 0 件になるので、429 / 5xx は待ってから 1 回再送する
     const resp = await callGemini(
       env.GEMINI_API_KEY,
       "gemini-2.5-flash",
       selectionBody,
+      { maxAttempts: 2 },
     );
     selectionResult = parseGeminiJson<SelectionResult>(resp);
   } catch (e: unknown) {
@@ -486,6 +488,7 @@ JSONのみ出力してください。`;
       env.GEMINI_API_KEY,
       "gemini-3-flash-preview",
       summaryBody,
+      { maxAttempts: 2 },
     );
     const parsed = parseGeminiJson<SummaryEntry[]>(resp);
     summaries = Array.isArray(parsed) ? parsed : [];

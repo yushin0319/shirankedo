@@ -10,6 +10,7 @@ import {
   pingHealthchecks,
   sanitizeForPrompt,
 } from "./cron-shared";
+import { buildDailyReposNotice } from "./daily-repos-notice";
 
 const GH_SEARCH_BASE = "https://api.github.com/search/repositories";
 const SEARCH_DELAY_MS = 2000;
@@ -182,11 +183,16 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     );
     if (!dryRun) {
       if (env.N8N_WEBHOOK_SECRET) {
-        await notifyObs(env.N8N_WEBHOOK_SECRET, {
-          severity: "info",
-          subject: `✅ shirankedo daily-repos 完了 (0件 / ${(durationMs / 1000).toFixed(1)}s)`,
-          summary,
-        });
+        await notifyObs(
+          env.N8N_WEBHOOK_SECRET,
+          buildDailyReposNotice({
+            count: 0,
+            durationMs,
+            summary,
+            postFailed: null,
+            geminiWarning: null,
+          }),
+        );
       }
       if (env.HC_PING_KEY)
         await pingHealthchecks(env.HC_PING_KEY, HC_SLUG, true, summary);
@@ -239,10 +245,13 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
     let text = "";
     try {
+      // 2026-08-09 / 09-16 に HTTP 524 (応答待ち約 2 分で打ち切り) で翻訳が落ち、
+      // そのバッチが原文のまま D1 に残った。待ってから 1 回だけ再送する (待ち時間は callGemini の既定)
       const resp = await callGemini(
         env.GEMINI_API_KEY,
         "gemini-2.5-flash",
         geminiBody,
+        { maxAttempts: 2 },
       );
       text = parseGeminiText(resp);
     } catch (e: unknown) {
@@ -342,16 +351,16 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
   const postFailed = postFailures.length > 0 ? postFailures.join(" / ") : null;
 
   if (env.N8N_WEBHOOK_SECRET) {
-    const ok = !postFailed && !geminiWarning;
-    const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
-      severity: ok ? "info" : "warning",
-      subject: postFailed
-        ? `❌ shirankedo daily-repos DB書込失敗 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
-        : geminiWarning
-          ? `⚠️ shirankedo daily-repos 完了(AI翻訳失敗) (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`
-          : `✅ shirankedo daily-repos 完了 (${translations.length}件 / ${(durationMs / 1000).toFixed(1)}s)`,
-      summary: postFailed ? `${summary} | DB書込失敗: ${postFailed}` : summary,
-    });
+    const r = await notifyObs(
+      env.N8N_WEBHOOK_SECRET,
+      buildDailyReposNotice({
+        count: translations.length,
+        durationMs,
+        summary,
+        postFailed,
+        geminiWarning,
+      }),
+    );
     if (!r.ok)
       console.log(
         JSON.stringify({ type: "obs_notify_failed", error: r.error }),
