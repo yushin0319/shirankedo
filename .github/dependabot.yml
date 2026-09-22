@@ -33,3 +33,25 @@ updates:
       # patch / minor (6.0.x) は従来どおり更新される。
       - dependency-name: "typescript"
         update-types: ["version-update:semver-major"]
+    groups:
+      # react と react-dom は完全に同一バージョンである必要がある
+      # (不一致だと react-dom が起動時に "Incompatible React versions" で throw し、
+      #  Worker がページを返せなくなる)。2026-09-12 に react だけ上がった PR #258 が
+      #  CI 失敗のまま auto-merge され、main が壊れた (PR #264 で復旧)。
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # astro 本体と @astrojs/* は peer で結びついている
+      # (@astrojs/cloudflare 14 の peer は astro ^7.0.0)。
+      astro:
+        patterns:
+          - "astro"
+          - "@astrojs/*"
+      # vitest 本体と @vitest/* は peer をバージョン厳密指定するため 1 PR にまとめる。
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
