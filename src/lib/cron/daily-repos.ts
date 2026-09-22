@@ -11,6 +11,10 @@ import {
   sanitizeForPrompt,
 } from "./cron-shared";
 import { buildDailyReposNotice } from "./daily-repos-notice";
+import {
+  parseRepoTranslations,
+  type TranslatedRepo,
+} from "./parse-repo-translations";
 
 const GH_SEARCH_BASE = "https://api.github.com/search/repositories";
 const SEARCH_DELAY_MS = 2000;
@@ -28,14 +32,6 @@ export interface DailyReposEnv {
 interface SearchRepoItem {
   repo: string;
   name: string;
-  description: string;
-  language: string;
-  stars: number;
-}
-
-interface TranslatedRepo {
-  repo: string;
-  displayName: string;
   description: string;
   language: string;
   stars: number;
@@ -209,6 +205,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
   let geminiWarning: string | null = null;
   const translations: TranslatedRepo[] = [];
+  const skippedRepos: string[] = [];
 
   for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
     const batch = batches[batchIdx];
@@ -266,22 +263,20 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
       );
     }
 
-    const textLines = text.split("\n").filter((l) => /^\d+\./.test(l.trim()));
-    for (let i = 0; i < batch.length; i++) {
-      const r = batch[i];
-      const line = textLines[i] ?? "";
-      const lineContent = line.replace(/^\d+\.\s*/, "").trim();
-      const parts = lineContent.split("|").map((s) => s.trim());
-      const displayName =
-        parts.length >= 2 ? parts[0] : (r.repo.split("/")[1] ?? r.repo);
-      const desc = parts.length >= 2 ? parts[1] : (r.description ?? "");
-      translations.push({
-        repo: r.repo,
-        displayName,
-        description: desc,
-        language: r.language,
-        stars: r.stars,
-      });
+    // 翻訳できなかったリポは保存しない。翌日 newRepos に再び入って翻訳される
+    // (原文のまま保存すると既存扱いになり、以後ずっと未翻訳で残ってしまう)
+    const parsed = parseRepoTranslations(batch, text);
+    translations.push(...parsed.translations);
+    if (parsed.skipped.length > 0) {
+      skippedRepos.push(...parsed.skipped);
+      console.log(
+        JSON.stringify({
+          type: "daily_repos_translation_skipped",
+          batch: batchIdx,
+          count: parsed.skipped.length,
+          repos: parsed.skipped,
+        }),
+      );
     }
 
     if (batchIdx < batches.length - 1) {
@@ -359,6 +354,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
         summary,
         postFailed,
         geminiWarning,
+        skipped: skippedRepos,
       }),
     );
     if (!r.ok)

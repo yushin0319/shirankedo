@@ -7,6 +7,48 @@ const base = {
   summary: "daily-repos: 14件 / 177.7s",
 };
 
+describe("buildDailyReposNotice (翻訳できず翌日に回した件数)", () => {
+  it("skipped が 0 なら本文に何も足さない", () => {
+    const n = buildDailyReposNotice({
+      ...base,
+      postFailed: null,
+      geminiWarning: null,
+      skipped: [],
+    });
+    expect(n.summary).toBe("daily-repos: 14件 / 177.7s");
+    expect(n.severity).toBe("info");
+  });
+
+  it("skipped があれば warning にして件数とリポ名を本文に載せる", () => {
+    const n = buildDailyReposNotice({
+      ...base,
+      postFailed: null,
+      geminiWarning: null,
+      skipped: ["owner/a", "owner/b"],
+    });
+    expect(n.severity).toBe("warning");
+    expect(n.subject).toBe(
+      "⚠️ shirankedo daily-repos 完了(翻訳失敗 2 件は翌日に再試行) (14件 / 177.7s)",
+    );
+    expect(n.summary).toBe(
+      "daily-repos: 14件 / 177.7s | 翻訳できず翌日に再試行: 2 件 (owner/a, owner/b)",
+    );
+  });
+
+  it("skipped が多い場合はリポ名を 5 件までにして残りは件数で示す", () => {
+    const skipped = ["r1", "r2", "r3", "r4", "r5", "r6", "r7"];
+    const n = buildDailyReposNotice({
+      ...base,
+      postFailed: null,
+      geminiWarning: null,
+      skipped,
+    });
+    expect(n.summary).toBe(
+      "daily-repos: 14件 / 177.7s | 翻訳できず翌日に再試行: 7 件 (r1, r2, r3, r4, r5 他 2 件)",
+    );
+  });
+});
+
 describe("buildDailyReposNotice", () => {
   it("失敗がなければ info で ✅ の件名、本文はサマリーのまま", () => {
     const n = buildDailyReposNotice({
