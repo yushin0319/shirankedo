@@ -20,7 +20,7 @@
     "@astrojs/react": "^6.0.6",
     "@tailwindcss/vite": "^4.3.3",
     "astro": "^7.3.3",
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
