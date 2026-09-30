@@ -6,7 +6,11 @@ import {
   subscriptionPlans,
 } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
-import { processLlmModels, processSubscriptionPlans } from "./ingest-history";
+import {
+  LLM_PRUNE_MIN_MODELS,
+  processLlmModels,
+  processSubscriptionPlans,
+} from "./ingest-history";
 
 type TestDb = ReturnType<typeof createTestDbWithTables>["db"];
 let db: TestDb;
@@ -65,9 +69,53 @@ describe("processLlmModels", () => {
     expect(history).toHaveLength(0);
   });
 
-  it("空配列で 0/0/0 を返す", async () => {
+  it("空配列で 0/0/0/0 を返す", async () => {
     const result = await processLlmModels(db, []);
-    expect(result).toEqual({ inserted: 0, updated: 0, historyCreated: 0 });
+    expect(result).toEqual({
+      inserted: 0,
+      updated: 0,
+      historyCreated: 0,
+      deleted: 0,
+    });
+  });
+
+  /** 一覧全体を模した N 件のモデル */
+  function fullList(n: number) {
+    return Array.from({ length: n }, (_, i) => ({
+      ...validModel,
+      modelName: `model-${i}`,
+    }));
+  }
+
+  it("一覧全体の送信時、一覧に無い既存モデルは履歴に残して削除する", async () => {
+    const list = fullList(LLM_PRUNE_MIN_MODELS);
+    await processLlmModels(db, [
+      ...list,
+      { ...validModel, modelName: "old-model", inputPrice: 1 },
+    ]);
+
+    const result = await processLlmModels(db, list);
+    expect(result.deleted).toBe(1);
+    expect(result.inserted).toBe(0);
+
+    const names = (await db.select().from(llmModels)).map((m) => m.modelName);
+    expect(names).toHaveLength(LLM_PRUNE_MIN_MODELS);
+    expect(names).not.toContain("old-model");
+
+    // 削除したモデルの最終値は history に残る
+    const history = await db.select().from(llmModelHistory);
+    expect(history).toHaveLength(1);
+    expect(history[0].modelName).toBe("old-model");
+    expect(history[0].inputPrice).toBe(1);
+  });
+
+  it("件数が少ない送信（部分取得の疑い）では削除しない", async () => {
+    await processLlmModels(db, fullList(LLM_PRUNE_MIN_MODELS));
+
+    const result = await processLlmModels(db, fullList(3));
+    expect(result.deleted).toBe(0);
+    const rows = await db.select().from(llmModels);
+    expect(rows).toHaveLength(LLM_PRUNE_MIN_MODELS);
   });
 });
 

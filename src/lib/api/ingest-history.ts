@@ -15,24 +15,51 @@ import { llmModelSchema, subscriptionPlanSchema } from "./schemas";
 // db.batch() に渡せるクエリの型
 type BatchQuery = Parameters<AppDatabase["batch"]>[0][number];
 
-/** LLM モデル: UPSERT + 変更検知 → history（batch で一括書き込み） */
+/**
+ * この件数以上の一覧が届いたら「全件の一覧」とみなし、一覧に無い既存モデルを削除する。
+ * 取得元（n8n 週次 WF）の一時的な部分取得でテーブルが空にならないための下限。
+ */
+export const LLM_PRUNE_MIN_MODELS = 20;
+
+/**
+ * LLM モデル: UPSERT + 変更検知 → history（batch で一括書き込み）
+ * 送られてきた一覧が全件（LLM_PRUNE_MIN_MODELS 件以上）なら、一覧に無いモデルは
+ * 最終値を history に残して削除する（旧版・廃止モデルが古い値のまま残り続けないように）
+ */
 export async function processLlmModels(
   db: AppDatabase,
   data: unknown[],
-): Promise<{ inserted: number; updated: number; historyCreated: number }> {
-  if (data.length === 0) return { inserted: 0, updated: 0, historyCreated: 0 };
+): Promise<{
+  inserted: number;
+  updated: number;
+  historyCreated: number;
+  deleted: number;
+}> {
+  if (data.length === 0)
+    return { inserted: 0, updated: 0, historyCreated: 0, deleted: 0 };
   const parsed = z.array(llmModelSchema).parse(data);
 
-  const names = parsed.map((m) => m.modelName);
+  // 削除判定のため全件取得（テーブルは 100 行程度。inArray は D1 の変数上限 100 に掛かる）
   const existing = await queryD1("llm_models.existing", () =>
-    db.select().from(llmModels).where(inArray(llmModels.modelName, names)),
+    db.select().from(llmModels),
   );
   const existingMap = new Map(existing.map((m) => [m.modelName, m]));
 
   let inserted = 0;
   let updated = 0;
   let historyCreated = 0;
+  let deleted = 0;
   const writes: BatchQuery[] = [];
+  const toHistory = (old: (typeof existing)[number]) =>
+    db.insert(llmModelHistory).values({
+      modelName: old.modelName,
+      provider: old.provider,
+      score: old.score,
+      inputPrice: old.inputPrice,
+      outputPrice: old.outputPrice,
+      currency: old.currency,
+      changedAt: new Date().toISOString(),
+    });
 
   for (const item of parsed) {
     const old = existingMap.get(item.modelName);
@@ -46,17 +73,7 @@ export async function processLlmModels(
 
       if (changed) {
         // 旧値を history に保存 + 本テーブルを更新
-        writes.push(
-          db.insert(llmModelHistory).values({
-            modelName: old.modelName,
-            provider: old.provider,
-            score: old.score,
-            inputPrice: old.inputPrice,
-            outputPrice: old.outputPrice,
-            currency: old.currency,
-            changedAt: new Date().toISOString(),
-          }),
-        );
+        writes.push(toHistory(old));
         writes.push(
           db
             .update(llmModels)
@@ -79,12 +96,23 @@ export async function processLlmModels(
     }
   }
 
+  if (parsed.length >= LLM_PRUNE_MIN_MODELS) {
+    const sent = new Set(parsed.map((m) => m.modelName));
+    for (const old of existing) {
+      if (sent.has(old.modelName)) continue;
+      writes.push(toHistory(old));
+      writes.push(db.delete(llmModels).where(eq(llmModels.id, old.id)));
+      historyCreated++;
+      deleted++;
+    }
+  }
+
   if (writes.length > 0) {
     await queryD1("llm_models.batch", () =>
       db.batch(writes as [BatchQuery, ...BatchQuery[]]),
     );
   }
-  return { inserted, updated, historyCreated };
+  return { inserted, updated, historyCreated, deleted };
 }
 
 /** サブスクプラン: UPSERT + 変更検知 → history（batch で一括書き込み） */
