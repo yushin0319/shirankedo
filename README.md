@@ -11,7 +11,7 @@
 - Tailwind CSS v4 / Zod / Drizzle ORM（D1）
 - Cloudflare D1（メイン DB、`shirankedo`）+ KV（キャッシュ・rate limit）
 - AI: Gemini 2.5 Flash（選定） + Gemini 3 Flash Preview（要約）
-- TypeScript 6 / Biome v2 / vitest v4（unit）+ Playwright（E2E）/ bun
+- TypeScript 6 / Biome v2 / vitest v5（unit）+ Playwright（E2E）/ bun
 - 観測: Sentry (toucan-js) / observability-tail (tail_consumers) / Workers Observability
 
 ## 構成
@@ -20,6 +20,8 @@
 - `src/pages/api/ingest/` — n8n からの ingest エンドポイント（後述）
 - `src/components/` — React Islands
 - `src/lib/` — `api/auth.ts`（X-API-Key 検証）、ingest ハンドラ
+- `src/lib/cron/` — Workers scheduled handler から呼ぶ日次バッチ（`daily-articles` / `daily-stars` / `daily-repos`）と共通処理（`cron-shared.ts`）
+- `src/worker.ts` — scheduled handler（cron 式 → バッチの振り分け）
 - `src/middleware.ts` — セキュリティヘッダー + ingest レート制限
 - `src/db/` — Drizzle スキーマ
 - `drizzle/` — D1 マイグレーション
@@ -35,6 +37,8 @@
 | トレンド | `trend-ranking` / `tracking-repos` / `repo-stats` / `repo-renames` |
 | 参考データ | `llm-models` / `subscription-plans` / `exchange-rate` / `page-comments` |
 
+手動 cron 実行（開発・障害復旧用）: `POST /api/admin/run-cron?name=<articles|repos|stars>`、認証は `X-Admin-Secret`（値は `INGEST_API_KEY` と同じ）。
+
 レート制限: `/api/ingest/**` 全体で **60 req/min/path**（KV ベース、TTL 120s、超過は 429 + `Retry-After: 60`）。
 
 セキュリティヘッダー（全レスポンス）: `X-Content-Type-Options: nosniff` / `X-Frame-Options: DENY` / `Referrer-Policy: strict-origin-when-cross-origin` / `Permissions-Policy: camera=(), microphone=(), geolocation=()`。
@@ -45,9 +49,11 @@
 bun install
 bun run dev        # 必須: wrangler dev は禁止（dist/ の古いビルドを配る）
 bun run test       # vitest (unit)
-bun run test:e2e   # Playwright (E2E, 要 bun run dev:e2e)
+bun run test:e2e   # Playwright (E2E)。webServer が dev:e2e（astro build + astro preview :4321）を起動する
 bun run build
 ```
+
+E2E はローカル D1 に `drizzle/0*.sql` と `e2e/seed.sql` を投入しておく前提（CI の e2e ジョブと同じ手順）。
 
 `bun run dev` は内部で remote から最新シードを取得 → Vite HMR + miniflare D1/KV を立ち上げる。
 
@@ -66,9 +72,9 @@ post-deploy smoke test（`/` / `/ai` / `/trend` / `/about` の全 4 ページで
 
 ```
 Cloudflare Workers scheduled handler (3 cron: 00:00 / 00:05 / 00:10 JST = 15:00/05/10 UTC)
-  ├─ daily-articles  : RSS 取得 → Gemini 要約 → D1 upsert
-  ├─ daily-stars     : 注目リポ星数集計 → D1
-  └─ daily-repos     : リポ統計（rename / forks 等）→ D1
+  ├─ daily-articles  (00:00) : RSS / arXiv 取得 → Gemini 2.5 Flash で選定 → 本文取得 → Gemini 3 Flash Preview で要約 → D1
+  ├─ daily-stars     (00:05) : 追跡リポのスター数を GitHub GraphQL で取得 → D1（repo_stats）
+  └─ daily-repos     (00:10) : GitHub Search で新規リポを発見 → Gemini で display_name・説明文を生成 → D1（tracking_repos / repo_stats）。翻訳できなかったリポは保存せず翌日再試行
 n8n cron (週次・補助系)
   ↓ POST /api/ingest/{trend-ranking,page-comments,llm-models,subscription-plans,exchange-rate,...}
   ↓ X-API-Key 認証 + Zod バリデーション + upsert
