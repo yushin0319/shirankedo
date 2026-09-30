@@ -262,14 +262,33 @@ export function parseGeminiText(response: GeminiResponseShape): string {
   return response?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
-/** プロンプト埋め込み前サニタイズ（改行・制御文字除去 + 長さ制限） */
+/**
+ * プロンプト埋め込み前サニタイズ（改行・制御文字除去 + 構造偽装除去 + 長さ制限）
+ *
+ * 外部 RSS / 記事本文 / GitHub description は攻撃者が内容を操作できるため、
+ * プロンプトの構造を偽装する記法を落としてから埋め込む。
+ * 対象はこのリポのプロンプトが実際に使っている記法に限定している:
+ *   - Markdown 見出し (`## 出力形式（JSON）` 等)
+ *   - 記事本文の区切り (`=== 記事N: ... ===`)
+ *   - 候補リストの行頭番号 (`1. ` / `[1] `)
+ * 日本語の見出し語そのもの（「出力形式」等）は除去しない。正当な記事本文を
+ * 壊す副作用のほうが大きいため、構造を作れなくすることで無効化する方針。
+ */
 export function sanitizeForPrompt(text: string, maxLength = 500): string {
   if (!text || typeof text !== "string") return "";
   return (
     text
       // biome-ignore lint/suspicious/noControlCharactersInRegex: 制御文字を意図的に除去する正規表現
       .replace(/[\n\r\t\x00-\x1f]/g, " ")
+      // Markdown 見出し記号（改行除去後なので先頭のみが実害を持つが、念のため全箇所）
+      .replace(/#{1,6}\s+/g, " ")
+      // 記事本文の区切り "=== ... ===" の偽装
+      .replace(/={3,}/g, " ")
       .replace(/\s{2,}/g, " ")
+      .trim()
+      // 候補リストの行頭番号・インデックス偽装（trim 後の先頭のみ）
+      .replace(/^\d+\.\s+/, "")
+      .replace(/^\[\d+\]\s*/, "")
       .trim()
       .substring(0, maxLength)
   );
