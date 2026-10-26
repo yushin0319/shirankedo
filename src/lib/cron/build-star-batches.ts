@@ -6,13 +6,15 @@ export interface StarBatch {
   batchIndex: number;
 }
 
-const BATCH_SIZE = 100;
+const BATCH_SIZE = 150;
 
 /**
- * tracking_repos の配列から GraphQL バッチを作る（100リポ/バッチ）。
- * stargazerCount は 1 field/repo で軽い (100 件 × 1 = 100 nodes、
- * GitHub maxNodeLimit 500,000 内)。Cloudflare Workers の subrequest 50 limit
- * を回避するため batch サイズを増やしている (旧 50 → 100 で half subreq)。
+ * tracking_repos の配列から GraphQL バッチを作る（150リポ/バッチ）。
+ * Cloudflare Workers Free の subrequest は 1 実行 50 回まで。100 件ずつだと
+ * 追跡 4,598 件で 1 実行 49 回 (warm-up + GraphQL 46 + 通知 + HC ping) になり、
+ * 2026-10-25 は 403 の再試行 2 回で上限に当たって HC ping が落ちた。
+ * 150 件なら同じ件数で約 34 回。GitHub は 1 クエリ 175 件までは通り、200 件は
+ * "Resource limits for this query exceeded" で全件拒否した (2026-10-27 実測) ので上げすぎない。
  */
 export function buildStarBatches(repos: { repo: string }[]): StarBatch[] {
   if (!repos.length) return [];

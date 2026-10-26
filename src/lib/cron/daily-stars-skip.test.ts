@@ -22,8 +22,8 @@ describe("runDailyStars graceful skip", () => {
   it("1 batch が恒久失敗しても全体を止めず、成功分を保存し obs warning を出す", async () => {
     const { db } = createTestDbWithTables();
     vi.mocked(getDb).mockReturnValue(db);
-    // 150 repos → BATCH_SIZE=100 で 2 batch (100 + 50)
-    const repos = Array.from({ length: 150 }, (_, i) => ({
+    // 200 repos → BATCH_SIZE=150 で 2 batch (150 + 50)
+    const repos = Array.from({ length: 200 }, (_, i) => ({
       repo: `owner${i}/repo${i}`,
       displayName: `repo${i}`,
     }));
