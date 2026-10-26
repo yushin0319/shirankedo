@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          check-latest: true
       - run: bun install --frozen-lockfile
       - name: Biome check
         run: bunx @biomejs/biome check .
@@ -36,6 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          check-latest: true
       - run: bun install --frozen-lockfile
       - name: Install Playwright Chromium
         run: bunx playwright install chromium --with-deps
