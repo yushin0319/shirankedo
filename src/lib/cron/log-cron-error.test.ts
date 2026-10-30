@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { logCronError } from "./log-cron-error";
+import { fakeObsBinding } from "./test-obs-binding";
 
 describe("logCronError", () => {
   let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let globalFetch: ReturnType<typeof vi.spyOn>;
 
   function makeCtx() {
     const promises: Promise<unknown>[] = [];
@@ -17,13 +18,14 @@ describe("logCronError", () => {
 
   beforeEach(() => {
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    fetchMock = vi.fn(async () => new Response("", { status: 204 }));
-    vi.stubGlobal("fetch", fetchMock);
+    // Worker から別 Worker の workers.dev URL は叩けない (error 1042) ので、グローバル fetch は使われない前提
+    globalFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("global fetch must not be used"));
   });
 
   afterEach(() => {
-    consoleLogSpy.mockRestore();
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("type:cron_failed の構造化ログを必ず残す", () => {
@@ -40,35 +42,54 @@ describe("logCronError", () => {
 
   it("N8N_WEBHOOK_SECRET 未設定なら obs-notify を呼ばない", async () => {
     const ctx = makeCtx();
-    logCronError("daily-vulns", new Error("oops"), {}, ctx);
+    const obs = fakeObsBinding();
+    logCronError("daily-vulns", new Error("oops"), { OBS: obs.binding }, ctx);
     await Promise.all(ctx.promises);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(obs.fetch).not.toHaveBeenCalled();
+    expect(globalFetch).not.toHaveBeenCalled();
   });
 
-  it("N8N_WEBHOOK_SECRET 設定ありなら obs-notify に warning を POST", async () => {
+  it("N8N_WEBHOOK_SECRET 設定ありなら Service binding で obs-notify に warning を POST", async () => {
     const ctx = makeCtx();
+    const obs = fakeObsBinding();
     logCronError(
       "daily-repos",
       new Error("GitHub GraphQL HTTP 502"),
-      { N8N_WEBHOOK_SECRET: "test-secret" },
+      { N8N_WEBHOOK_SECRET: "test-secret", OBS: obs.binding },
       ctx,
     );
     await Promise.all(ctx.promises);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toContain("obs-notify");
-    expect((init as RequestInit).method).toBe("POST");
-    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(globalFetch).not.toHaveBeenCalled();
+    expect(obs.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = obs.fetch.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/obs-notify");
+    expect(init?.method).toBe("POST");
+    const headers = init?.headers as Record<string, string>;
     expect(headers["X-Webhook-Secret"]).toBe("test-secret");
-    const body = JSON.parse((init as RequestInit).body as string);
+    const body = JSON.parse(String(init?.body));
     expect(body.severity).toBe("warning");
     expect(body.subject).toContain("daily-repos");
     expect(body.summary).toContain("GitHub GraphQL HTTP 502");
     expect(body.raw_payload.cron).toBe("daily-repos");
     expect(body.service).toBe("cf-worker");
     expect(body.repo).toBe("shirankedo");
+  });
+
+  it("binding が無くても落ちず、構造化ログは残る", async () => {
+    const ctx = makeCtx();
+    logCronError(
+      "daily-stars",
+      new Error("boom"),
+      { N8N_WEBHOOK_SECRET: "test-secret" },
+      ctx,
+    );
+    await expect(Promise.all(ctx.promises)).resolves.toBeDefined();
+
+    expect(globalFetch).not.toHaveBeenCalled();
+    const logged = JSON.parse(consoleLogSpy.mock.calls[0][0] as string);
+    expect(logged.type).toBe("cron_failed");
   });
 
   it("Error 以外 (string 等) を投げても落ちず構造化ログは残す", () => {

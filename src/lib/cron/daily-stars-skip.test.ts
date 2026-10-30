@@ -3,6 +3,7 @@ import { getDb } from "../../db/client";
 import { repoStats, trackingRepos } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
 import { type DailyStarsEnv, runDailyStars } from "./daily-stars";
+import { fakeObsBinding } from "./test-obs-binding";
 
 // runDailyStars は内部で getDb(env.DB) を呼び D1 ドライバで包む。
 // テストでは in-memory (better-sqlite3) DB を返すよう差し替える。
@@ -32,7 +33,7 @@ describe("runDailyStars graceful skip", () => {
     let graphqlCalls = 0;
     const obsBodies: Record<string, unknown>[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
+      async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/zen")) {
           return new Response("warmup ok", { status: 200 });
@@ -49,10 +50,6 @@ describe("runDailyStars graceful skip", () => {
           }
           return new Response("bad request", { status: 400 });
         }
-        if (url.includes("obs-notify")) {
-          obsBodies.push(JSON.parse(String(init?.body)));
-          return new Response("ok", { status: 200 });
-        }
         throw new Error(`unexpected fetch: ${url}`);
       },
     );
@@ -62,6 +59,7 @@ describe("runDailyStars graceful skip", () => {
       GITHUB_TOKEN: "TOKEN",
       DAILY_STARS_ENABLED: "true",
       N8N_WEBHOOK_SECRET: "secret",
+      OBS: fakeObsBinding(obsBodies).binding,
       // HC_PING_KEY は未設定 → HC ping をスキップ
     };
 
@@ -92,7 +90,7 @@ describe("runDailyStars graceful skip", () => {
 
     const obsBodies: Record<string, unknown>[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(
-      async (input: RequestInfo | URL, init?: RequestInit) => {
+      async (input: RequestInfo | URL) => {
         const url = String(input);
         if (url.includes("/zen")) {
           return new Response("warmup ok", { status: 200 });
@@ -101,10 +99,6 @@ describe("runDailyStars graceful skip", () => {
           // 全 batch を失敗させる (token 失効 / 全断を模す)。retry 待ちを避ける
           // ため非 retry の 400 を使う (全失敗ガードは失敗理由を問わない)。
           return new Response("bad request", { status: 400 });
-        }
-        if (url.includes("obs-notify")) {
-          obsBodies.push(JSON.parse(String(init?.body)));
-          return new Response("ok", { status: 200 });
         }
         throw new Error(`unexpected fetch: ${url}`);
       },
@@ -115,6 +109,7 @@ describe("runDailyStars graceful skip", () => {
       GITHUB_TOKEN: "TOKEN",
       DAILY_STARS_ENABLED: "true",
       N8N_WEBHOOK_SECRET: "secret",
+      OBS: fakeObsBinding(obsBodies).binding,
     };
 
     // 全 batch 失敗は graceful skip で握り潰さず throw する

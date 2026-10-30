@@ -71,7 +71,7 @@ bunx wrangler d1 migrations apply shirankedo --remote
 bunx wrangler deploy
 ```
 
-post-deploy smoke test（`/` / `/ai` / `/trend` / `/about` の全 4 ページで 200 OK 確認）が走り、失敗時は obs-notify に warning で通知（観測性 DB に記録、Discord は日次まとめ）。
+post-deploy smoke test（`/` / `/ai` / `/trend` / `/about` の全 4 ページで 200 OK 確認）が走り、失敗時は observability-tail Worker の `/obs-notify`（`https://observability-tail.y-fudo.workers.dev/obs-notify`）に warning で通知（観測性 DB に記録、Discord は日次まとめ）。合言葉は GitHub secret `OBS_WEBHOOK_SECRET` を `X-Webhook-Secret` ヘッダで送る。
 
 ## データフロー
 
@@ -89,7 +89,9 @@ Cloudflare D1 (shirankedo)
 Astro + React Islands → Cloudflare Workers → ユーザー
 ```
 
-Worker scheduled handler の失敗は `logCronError` が `console.log({type:"cron_failed"})`（observability-tail が拾う）と `notifyObs(severity=warning)`（obs-notify を直接叩く）の両方で通知する二重保険（PR #137 / #158）。obs-notify は観測性 DB に記録し、warning の Discord 通知は日次まとめ。
+Worker scheduled handler の失敗は `logCronError` が `console.log({type:"cron_failed"})`（Tail Worker の observability-tail が拾う）と `notifyObs(severity=warning)`（observability-tail の `/obs-notify` を直接叩く）の両方で通知する二重保険（PR #137 / #158）。observability-tail は観測性 DB に記録し、warning の Discord 通知は日次まとめ。
+
+cron の観測性通知（`notifyObs`）は Service binding `OBS`（`wrangler.jsonc` の `services`）で observability-tail を呼ぶ。同じアカウントの Worker から別 Worker の workers.dev URL を fetch すると error 1042 で失敗するため。合言葉は Worker secret `N8N_WEBHOOK_SECRET` を `X-Webhook-Secret` ヘッダで送り、未設定なら通知をスキップする。
 
 ## 運用ルール
 

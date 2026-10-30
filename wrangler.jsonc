@@ -22,6 +22,14 @@
       "service": "observability-tail"
     }
   ],
+  // cron の観測性通知 (notifyObs) を observability-tail の /obs-notify に送る。
+  // 同じアカウントの Worker 同士は workers.dev の URL を fetch できない (error 1042) ので Service binding で呼ぶ
+  "services": [
+    {
+      "binding": "OBS",
+      "service": "observability-tail"
+    }
+  ],
   "vars": {
     "DAILY_ARTICLES_ENABLED": "true",
     "DAILY_REPOS_ENABLED": "true"

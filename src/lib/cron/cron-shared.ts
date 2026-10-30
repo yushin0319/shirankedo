@@ -1,6 +1,11 @@
 // Cron ジョブ共通ユーティリティ
 const HC_BASE = "https://hc-ping.com";
-const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
+/**
+ * observability-tail Worker の観測性イベント受付。Service binding (env.OBS) 経由で呼ぶので
+ * ホスト名は使われず、パスだけが届く。同じアカウントの Worker から workers.dev の URL を
+ * fetch すると error 1042 で失敗するため、公開 URL は使わない。
+ */
+const OBS_NOTIFY_URL = "https://observability-tail/obs-notify";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const SHIRANKEDO_BASE = "https://shirankedo.y-fudo.workers.dev/api/ingest";
 
@@ -8,13 +13,19 @@ export interface GeminiResponseShape {
   candidates?: { content?: { parts?: { text?: string }[] } }[];
 }
 
-/** 副作用通知の共通 fetch ラッパー（失敗をエラーにしない） */
+/** Service binding (wrangler.jsonc の services) のうち、ここで使う fetch だけの型 */
+export interface ServiceBinding {
+  fetch(input: string, init?: RequestInit): Promise<Response>;
+}
+
+/** 副作用通知の共通 fetch ラッパー（失敗をエラーにしない）。via を渡すとその Service binding 経由で送る */
 export async function safeFetch(
   url: string,
   init: RequestInit,
+  via?: ServiceBinding,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(url, init);
+    const res = await (via ? via.fetch(url, init) : fetch(url, init));
     return res.ok ? { ok: true } : { ok: false, error: `HTTP ${res.status}` };
   } catch (e: unknown) {
     return { ok: false, error: String(e) };
@@ -137,8 +148,23 @@ export async function fetchWithRetry(
   throw new Error("unreachable");
 }
 
-/** obs-notify 経由で Discord + Notion 観測性 DB に通知 */
+/** 観測性通知を送る cron が env に持つもの */
+export interface ObsNotifyEnv {
+  /** observability-tail への Service binding。無い環境 (テスト・ローカル) では通知を送らない */
+  OBS?: ServiceBinding;
+  /**
+   * observability-tail の /obs-notify に X-Webhook-Secret として付ける合言葉。
+   * 未設定なら通知をスキップする。
+   */
+  N8N_WEBHOOK_SECRET?: string;
+}
+
+/**
+ * observability-tail の /obs-notify に送る (観測性 DB への記録と Discord 通知は observability-tail が行う)。
+ * 失敗しても throw せず Result で返す。
+ */
 export async function notifyObs(
+  obs: ServiceBinding | undefined,
   webhookSecret: string,
   payload: {
     severity: "critical" | "warning" | "info";
@@ -147,18 +173,23 @@ export async function notifyObs(
     raw_payload?: unknown;
   },
 ): Promise<{ ok: boolean; error?: string }> {
-  return safeFetch(N8N_OBS_NOTIFY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Webhook-Secret": webhookSecret,
+  if (!obs) return { ok: false, error: "OBS service binding not configured" };
+  return safeFetch(
+    OBS_NOTIFY_URL,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Webhook-Secret": webhookSecret,
+      },
+      body: JSON.stringify({
+        ...payload,
+        service: "cf-worker",
+        repo: "shirankedo",
+      }),
     },
-    body: JSON.stringify({
-      ...payload,
-      service: "cf-worker",
-      repo: "shirankedo",
-    }),
-  });
+    obs,
+  );
 }
 
 /** Healthchecks.io ping（slug 付き版） */
