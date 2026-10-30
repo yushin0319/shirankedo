@@ -33,6 +33,10 @@ export async function safeFetch(
  *
  * 成功 (res.ok) の Response を返す。retry を尽くしても失敗なら throw (呼び出し元で
  * graceful-skip するかは各 cron の設計次第)。
+ *
+ * AbortSignal.timeout は本文の受信にも効くので、成功時の本文はこの中で読み切り、
+ * 読み切った本文で作り直した Response を返す。呼び出し元が後から json() / text() で
+ * 読んでも timeout にならず、本文受信中の timeout は fetch 例外と同じく retry される。
  */
 export interface FetchRetryOptions {
   /** ログ / エラーメッセージの prefix (例: "GitHub GraphQL", "GitHub Search") */
@@ -58,13 +62,25 @@ export async function fetchWithRetry(
   const rateLimitWaitMs = opts.rateLimitWaitMs ?? 60000;
   const cap = opts.retrySleepCapMs ?? 30000;
   const ctx = opts.context ? ` ${opts.context}` : "";
-  let res: Response | null = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    let res: Response;
+    let phase: "headers" | "body" = "headers";
     try {
       res = await fetch(url, {
         ...init,
         signal: AbortSignal.timeout(timeoutMs),
       });
+      if (res.ok) {
+        phase = "body";
+        const body = await res.arrayBuffer();
+        // 204 / 205 は本文を持てない status で、本文を渡すと new Response() が TypeError になる
+        const noBody = res.status === 204 || res.status === 205;
+        return new Response(noBody ? null : body, {
+          status: res.status,
+          statusText: res.statusText,
+          headers: res.headers,
+        });
+      }
     } catch (e) {
       if (attempt < maxAttempts) {
         const sleepMs = Math.min(attempt * 1000, cap);
@@ -73,6 +89,7 @@ export async function fetchWithRetry(
             type: "fetch_timeout",
             label: opts.label,
             context: opts.context,
+            phase,
             error: String(e).substring(0, 100),
             attempt,
             sleep_ms: sleepMs,
@@ -85,7 +102,6 @@ export async function fetchWithRetry(
         `${opts.label} fetch failed${ctx} (after ${attempt} attempts): ${String(e).substring(0, 200)}`,
       );
     }
-    if (res.ok) break;
     const isRateLimit = res.status === 403;
     const isTransientAuth = res.status === 401;
     const isServerError = res.status >= 500;
@@ -118,8 +134,7 @@ export async function fetchWithRetry(
       `${opts.label} HTTP ${res.status}${ctx} (after ${attempt} attempts)`,
     );
   }
-  if (!res) throw new Error("unreachable");
-  return res;
+  throw new Error("unreachable");
 }
 
 /** obs-notify 経由で Discord + Notion 観測性 DB に通知 */

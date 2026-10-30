@@ -7,6 +7,22 @@ const okResponse = (body = "{}") =>
     headers: { "content-type": "application/json" },
   });
 
+// ヘッダ (status 200) までは返るが、本文を読むと AbortSignal.timeout の TimeoutError になる応答
+const bodyTimeoutResponse = () =>
+  new Response(
+    new ReadableStream({
+      pull(controller) {
+        controller.error(
+          new DOMException(
+            "The operation was aborted due to timeout",
+            "TimeoutError",
+          ),
+        );
+      },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
@@ -104,4 +120,80 @@ describe("fetchWithRetry", () => {
     expect(spy).toHaveBeenCalledTimes(2);
     expect(res.status).toBe(200);
   }, 30000);
+
+  it("本文の受信中に TimeoutError が出たら再試行し、2 回目の本文を返す", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(bodyTimeoutResponse())
+      .mockResolvedValueOnce(okResponse('{"items":[1,2]}'));
+
+    const promise = fetchWithRetry(
+      "https://example.test",
+      {},
+      { label: "T", context: "q=5" },
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    const res = await promise;
+
+    expect(spy).toHaveBeenCalledTimes(2);
+    // 呼び出し元は返った Response をそのまま json() / text() で読む
+    expect(await res.json()).toEqual({ items: [1, 2] });
+  }, 30000);
+
+  it("本文の受信で毎回 TimeoutError なら (after N attempts) で throw する", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const spy = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async () => bodyTimeoutResponse());
+
+    const promise = fetchWithRetry(
+      "https://example.test",
+      {},
+      { label: "T", context: "q=6", maxAttempts: 2 },
+    );
+    const expectation = expect(promise).rejects.toThrow(
+      /T fetch failed q=6 \(after 2 attempts\): TimeoutError/,
+    );
+    await vi.advanceTimersByTimeAsync(5000);
+    await expectation;
+    expect(spy).toHaveBeenCalledTimes(2);
+  }, 30000);
+
+  it("返す Response は status / statusText / headers / 本文を保つ", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response("<rss>feed</rss>", {
+        status: 200,
+        statusText: "OK",
+        headers: { "content-type": "application/rss+xml" },
+      }),
+    );
+
+    const res = await fetchWithRetry(
+      "https://example.test",
+      {},
+      { label: "T" },
+    );
+
+    expect(res.ok).toBe(true);
+    expect(res.status).toBe(200);
+    expect(res.statusText).toBe("OK");
+    expect(res.headers.get("content-type")).toBe("application/rss+xml");
+    expect(await res.text()).toBe("<rss>feed</rss>");
+  });
+
+  it("204 (本文なし) でも Response を返せる", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      new Response(null, { status: 204 }),
+    );
+
+    const res = await fetchWithRetry(
+      "https://example.test",
+      {},
+      { label: "T" },
+    );
+
+    expect(res.status).toBe(204);
+    expect(await res.text()).toBe("");
+  });
 });
