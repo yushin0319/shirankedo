@@ -6,6 +6,7 @@ import {
   callGemini,
   fetchWithRetry,
   notifyObs,
+  type ObsNotifyEnv,
   parseGeminiText,
   pingHealthchecks,
   sanitizeForPrompt,
@@ -20,11 +21,10 @@ const GH_SEARCH_BASE = "https://api.github.com/search/repositories";
 const SEARCH_DELAY_MS = 2000;
 const HC_SLUG = "shirankedo-daily-repos";
 
-export interface DailyReposEnv {
+export interface DailyReposEnv extends ObsNotifyEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
   GEMINI_API_KEY: string;
-  N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_REPOS_ENABLED?: string;
 }
@@ -180,6 +180,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     if (!dryRun) {
       if (env.N8N_WEBHOOK_SECRET) {
         await notifyObs(
+          env.OBS,
           env.N8N_WEBHOOK_SECRET,
           buildDailyReposNotice({
             count: 0,
@@ -347,6 +348,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
 
   if (env.N8N_WEBHOOK_SECRET) {
     const r = await notifyObs(
+      env.OBS,
       env.N8N_WEBHOOK_SECRET,
       buildDailyReposNotice({
         count: translations.length,

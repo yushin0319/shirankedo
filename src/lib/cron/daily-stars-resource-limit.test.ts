@@ -9,6 +9,7 @@ import {
   refetchBudgetFor,
   runDailyStars,
 } from "./daily-stars";
+import { fakeObsBinding } from "./test-obs-binding";
 
 vi.mock("../../db/client", () => ({ getDb: vi.fn() }));
 
@@ -237,10 +238,6 @@ describe("runDailyStars の取り直し結果の報告", () => {
           // batch 0 (150 件) は全件取れる / batch 1 (50 件) は取り直しても上限超過のまま
           return aliases.includes("r0") ? allFound(init) : allLimited(aliases);
         }
-        if (url.includes("obs-notify")) {
-          obsBodies.push(JSON.parse(String(init?.body)));
-          return new Response("ok", { status: 200 });
-        }
         throw new Error(`unexpected fetch: ${url}`);
       },
     );
@@ -254,6 +251,7 @@ describe("runDailyStars の取り直し結果の報告", () => {
       GITHUB_TOKEN: "TOKEN",
       DAILY_STARS_ENABLED: "true",
       N8N_WEBHOOK_SECRET: "secret",
+      OBS: fakeObsBinding(obsBodies).binding,
     };
     const result = await runDailyStars(env);
 

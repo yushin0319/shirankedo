@@ -6,6 +6,7 @@ import {
   callGemini,
   fetchWithRetry,
   notifyObs,
+  type ObsNotifyEnv,
   parseGeminiJson,
   pingHealthchecks,
   sanitizeForPrompt,
@@ -24,10 +25,9 @@ const RSS_SOURCES = [
 const ARXIV_URL =
   "http://export.arxiv.org/api/query?search_query=cat:cs.*&sortBy=submittedDate&sortOrder=descending&max_results=30";
 
-export interface DailyArticlesEnv {
+export interface DailyArticlesEnv extends ObsNotifyEnv {
   DB: D1Database;
   GEMINI_API_KEY: string;
-  N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_ARTICLES_ENABLED?: string;
 }
@@ -262,7 +262,7 @@ export async function runDailyArticles(env: DailyArticlesEnv): Promise<void> {
     );
     if (!dryRun) {
       if (env.N8N_WEBHOOK_SECRET)
-        await notifyObs(env.N8N_WEBHOOK_SECRET, {
+        await notifyObs(env.OBS, env.N8N_WEBHOOK_SECRET, {
           severity: "info",
           subject: `✅ shirankedo daily-articles 完了 (0件 / ${(durationMs / 1000).toFixed(1)}s)`,
           summary,
@@ -404,7 +404,7 @@ JSONのみ出力してください。`;
     );
     if (!dryRun) {
       if (env.N8N_WEBHOOK_SECRET)
-        await notifyObs(env.N8N_WEBHOOK_SECRET, {
+        await notifyObs(env.OBS, env.N8N_WEBHOOK_SECRET, {
           severity: "info",
           subject: `✅ shirankedo daily-articles 完了 (0件)`,
           summary,
@@ -562,7 +562,7 @@ JSONのみ出力してください。`;
 
   if (env.N8N_WEBHOOK_SECRET) {
     const ok = !postFailed && !geminiWarning;
-    const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
+    const r = await notifyObs(env.OBS, env.N8N_WEBHOOK_SECRET, {
       severity: ok ? "info" : "warning",
       subject: postFailed
         ? `❌ shirankedo daily-articles DB書込失敗 (${apiBody.length}件 / ${(durationMs / 1000).toFixed(1)}s)`

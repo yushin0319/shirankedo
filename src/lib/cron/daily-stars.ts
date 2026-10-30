@@ -7,7 +7,12 @@ import {
   buildStarSubBatch,
   type StarBatch,
 } from "./build-star-batches";
-import { fetchWithRetry } from "./cron-shared";
+import {
+  fetchWithRetry,
+  notifyObs,
+  type ObsNotifyEnv,
+  safeFetch,
+} from "./cron-shared";
 
 const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
@@ -20,7 +25,7 @@ const REFETCH_CHUNK = 75;
 const MAX_REFETCH_SPLITS = 1;
 /** Cloudflare Workers Free の 1 実行あたり subrequest 上限 */
 const SUBREQUEST_LIMIT = 50;
-/** GraphQL 以外の subrequest: warm-up 1 + obs-notify 1 + HC ping 1 */
+/** GraphQL 以外の subrequest: warm-up 1 + obs-notify 1 (Service binding の呼び出しも 1 回に数える) + HC ping 1 */
 const NON_GRAPHQL_SUBREQUESTS = 3;
 /** fetchWithRetry の再試行 (403 / 5xx / timeout) で増える分として空けておく数 */
 const RETRY_RESERVE = 5;
@@ -28,11 +33,6 @@ const RETRY_RESERVE = 5;
 const MAX_REFETCH_REQUESTS = 6;
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
-/**
- * 観測性通知は n8n の api/obs-notify 経由 (#529)。
- * severity 別 Discord channel + Notion 観測性ログ DB は obs-notify WF が担当。
- */
-const N8N_OBS_NOTIFY = "https://yushin-n8n.duckdns.org/webhook/obs-notify";
 /** D1 INSERT のチャンクサイズ。776 行を 50 行ずつにまとめて subrequest 数を抑える。 */
 const INSERT_CHUNK = 50;
 /**
@@ -44,19 +44,15 @@ export const DAILY_STARS_CRON = "5 15 * * *";
 /**
  * runDailyStars が利用する env binding。`src/env.d.ts` の `cloudflare:workers`
  * env から DB を、cron 用 secret は本ファイルで個別宣言（main の env.d.ts に
- * 余計な type を増やさず、scope を本 cron 内に閉じる方針）。
+ * 余計な type を増やさず、scope を cron 内に閉じる方針）。観測性通知の binding と
+ * 合言葉は 3 cron 共通の ObsNotifyEnv (cron-shared.ts) にまとめている。
  *
  * `DAILY_STARS_ENABLED !== "true"` のときは dry-run（D1 INSERT・通知・ping
  * を全スキップ）。本番並走時のデータ重複を避ける安全装置。
  */
-export interface DailyStarsEnv {
+export interface DailyStarsEnv extends ObsNotifyEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
-  /**
-   * n8n の api/obs-notify webhook を叩くための共通 secret (#529)。
-   * 未設定なら通知をスキップ。
-   */
-  N8N_WEBHOOK_SECRET?: string;
   HC_PING_KEY?: string;
   DAILY_STARS_ENABLED?: string;
 }
@@ -276,45 +272,6 @@ export async function fetchBatch(
     }),
   );
   return { stars, renames, refetch };
-}
-
-/**
- * 副作用通知（Discord/Healthchecks）の共通 fetch ラッパ。
- * 失敗を WF 全体失敗にせず Result で呼び出し元に返す（呼び出し元はログ記録のみ）。
- */
-async function safeFetch(
-  url: string,
-  init: RequestInit,
-): Promise<{ ok: boolean; error?: string }> {
-  try {
-    const res = await fetch(url, init);
-    return res.ok ? { ok: true } : { ok: false, error: `HTTP ${res.status}` };
-  } catch (e: unknown) {
-    return { ok: false, error: String(e) };
-  }
-}
-
-async function notifyObs(
-  webhookSecret: string,
-  payload: {
-    severity: "critical" | "warning" | "info";
-    subject: string;
-    summary?: string;
-    raw_payload?: unknown;
-  },
-): Promise<{ ok: boolean; error?: string }> {
-  return safeFetch(N8N_OBS_NOTIFY, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Webhook-Secret": webhookSecret,
-    },
-    body: JSON.stringify({
-      ...payload,
-      service: "cf-worker",
-      repo: "shirankedo",
-    }),
-  });
 }
 
 /** Healthchecks ping（成功・失敗両方の経路で使う、非ブロッキング前提）。 */
@@ -552,7 +509,7 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     }),
   );
 
-  // 5. 観測性通知（dry-run 時はスキップ、n8n obs-notify 経由 / severity=info）
+  // 5. 観測性通知（dry-run 時はスキップ、observability-tail の obs-notify 経由 / 欠損が無ければ info、あれば warning）
   if (!dryRun && env.N8N_WEBHOOK_SECRET) {
     let summaryText = summary;
     if (allRenames.length) {
@@ -566,7 +523,7 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
     if (refetch.unrecovered)
       losses.push(`取り直し失敗 ${refetch.unrecovered} 件`);
     const hasFailed = losses.length > 0;
-    const r = await notifyObs(env.N8N_WEBHOOK_SECRET, {
+    const r = await notifyObs(env.OBS, env.N8N_WEBHOOK_SECRET, {
       severity: hasFailed ? "warning" : "info",
       subject: hasFailed
         ? `⚠ shirankedo daily-stars 部分欠損 (${allStars.length}件取得 / ${losses.join(" / ")})`
