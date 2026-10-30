@@ -22,17 +22,42 @@ export function buildStarBatches(repos: { repo: string }[]): StarBatch[] {
   for (let i = 0; i < repos.length; i += BATCH_SIZE) {
     const batch = repos.slice(i, i + BATCH_SIZE);
     const repoMap: Record<string, string> = {};
-    const parts = batch.map((r, idx) => {
-      const alias = `r${i + idx}`;
-      const [owner, name] = r.repo.split("/");
-      repoMap[alias] = r.repo;
-      return `${alias}: repository(owner: "${safe(owner)}", name: "${safe(name)}") { nameWithOwner stargazerCount }`;
+    batch.forEach((r, idx) => {
+      repoMap[`r${i + idx}`] = r.repo;
     });
     batches.push({
-      query: `{${parts.join(" ")}}`,
+      query: buildStarQuery(repoMap),
       repoMap,
       batchIndex: batches.length,
     });
   }
   return batches;
+}
+
+/**
+ * バッチの一部のエイリアスだけを問い合わせる StarBatch を作る (取り直し用)。
+ * エイリアスと batchIndex は元のまま使うので、応答の読み方とログは元のバッチと同じになる。
+ */
+export function buildStarSubBatch(
+  batch: StarBatch,
+  aliases: string[],
+): StarBatch {
+  const repoMap: Record<string, string> = {};
+  for (const alias of aliases) {
+    const repo = batch.repoMap[alias];
+    if (repo !== undefined) repoMap[alias] = repo;
+  }
+  return {
+    query: buildStarQuery(repoMap),
+    repoMap,
+    batchIndex: batch.batchIndex,
+  };
+}
+
+function buildStarQuery(repoMap: Record<string, string>): string {
+  const parts = Object.entries(repoMap).map(([alias, repo]) => {
+    const [owner, name] = repo.split("/");
+    return `${alias}: repository(owner: "${safe(owner)}", name: "${safe(name)}") { nameWithOwner stargazerCount }`;
+  });
+  return `{${parts.join(" ")}}`;
 }
