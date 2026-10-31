@@ -18,19 +18,26 @@ const GH_GRAPHQL = "https://api.github.com/graphql";
 const BATCH_INTERVAL_MS = 200; // GitHub secondary rate limit 回避
 /**
  * GitHub は 150 件の問い合わせを RESOURCE_LIMITS_EXCEEDED で打ち切り、バッチのほぼ全件を
- * null で返すことがある。null になった分は半分の 75 件ずつで問い合わせ直す。
+ * null で返すことがある。null になった分 (NOT_FOUND 以外) は半分の 75 件ずつで問い合わせ直す。
  */
 const REFETCH_CHUNK = 75;
-/** 取り直しも上限超過なら、さらに半分に割って問い合わせる回数 (75 → 37/38 の 1 段まで) */
+/** 取り直しでも取れなければ、さらに半分に割って問い合わせる回数 (75 → 37/38 の 1 段まで) */
 const MAX_REFETCH_SPLITS = 1;
 /** Cloudflare Workers Free の 1 実行あたり subrequest 上限 */
 const SUBREQUEST_LIMIT = 50;
-/** GraphQL 以外の subrequest: warm-up 1 + obs-notify 1 (Service binding の呼び出しも 1 回に数える) + HC ping 1 */
-const NON_GRAPHQL_SUBREQUESTS = 3;
-/** fetchWithRetry の再試行 (403 / 5xx / timeout) で増える分として空けておく数 */
+/** warm-up の GET /zen */
+const WARMUP_SUBREQUESTS = 1;
+/**
+ * GraphQL の後に必ず使う subrequest。成功時は obs-notify 1 (Service binding の呼び出しも
+ * 1 回に数える) + HC ping 1、全バッチ失敗時 (worker.ts) も通知 + HC fail ping の 2 回。
+ */
+const TAIL_SUBREQUESTS = 2;
+/** 後のバッチの再試行 (403 / 5xx / timeout) のために、取り直しでは使わずに空けておく数 */
 const RETRY_RESERVE = 5;
 /** 1 実行あたりの取り直しの問い合わせ回数の上限 */
 const MAX_REFETCH_REQUESTS = 6;
+/** 本体の問い合わせの試行回数の上限 (fetchWithRetry の既定と同じ) */
+const MAX_FETCH_ATTEMPTS = 5;
 const HC_BASE = "https://hc-ping.com";
 const HC_SLUG = "shirankedo-daily-stars";
 /** D1 INSERT のチャンクサイズ。776 行を 50 行ずつにまとめて subrequest 数を抑える。 */
@@ -79,12 +86,23 @@ interface RefetchStats {
 interface BatchResult {
   stars: StarRow[];
   renames: RenameRow[];
+  /** NOT_FOUND (削除・改名で見つからない) で取れなかった件数 */
+  notFound: number;
   refetch: RefetchStats;
 }
 
-/** 取り直しの残り回数。1 実行の中で全バッチが 1 つを共有して減らす */
-export interface RefetchBudget {
-  remaining: number;
+/**
+ * 1 実行の subrequest の台帳。全バッチが 1 つを共有し、GraphQL を投げるたびに used を増やす。
+ * 本体の再試行と取り直しは、後に要る分 (pending) を残せる範囲に抑えて上限 50 回を超えない。
+ * 残りのバッチを 1 回ずつ投げられる前提なので、成り立つのはバッチ数 47 (約 7,000 件) まで。
+ */
+export interface SubrequestBudget {
+  /** この実行で使った数 (warm-up と、再試行・取り直しを含む GraphQL の問い合わせ) */
+  used: number;
+  /** いまのバッチの後に必ず使う数 (残りのバッチ 1 回ずつ + 通知 + HC ping) */
+  pending: number;
+  /** 取り直しの残り回数 (1 実行で MAX_REFETCH_REQUESTS まで) */
+  refetchLeft: number;
 }
 
 interface StarsResponse {
@@ -96,20 +114,27 @@ interface StarsResponse {
 }
 
 /**
- * 1 実行で取り直しに使ってよい問い合わせ回数。subrequest 上限から、本体のバッチ数・
- * GraphQL 以外の分・再試行の予備を引いた残りを、MAX_REFETCH_REQUESTS まで使う。
+ * 取り直しを 1 回投げてよいか。投げた後も、後に要る分と再試行の予備を残して上限に収まるときだけ許す。
  */
-export function refetchBudgetFor(batchCount: number): number {
-  const spare =
-    SUBREQUEST_LIMIT - NON_GRAPHQL_SUBREQUESTS - RETRY_RESERVE - batchCount;
-  return Math.max(0, Math.min(MAX_REFETCH_REQUESTS, spare));
+export function canRefetch(budget: SubrequestBudget): boolean {
+  return (
+    budget.refetchLeft > 0 &&
+    budget.used + 1 + budget.pending + RETRY_RESERVE <= SUBREQUEST_LIMIT
+  );
 }
 
-/** GraphQL を 1 回投げて JSON を返す。本文が JSON として読めなければ null */
+/** 本体の問い合わせに使ってよい試行回数。後に要る分を残し、少なくとも 1 回は投げる */
+function mainAttemptsFor(budget: SubrequestBudget): number {
+  const spare = SUBREQUEST_LIMIT - budget.used - budget.pending;
+  return Math.max(1, Math.min(MAX_FETCH_ATTEMPTS, spare));
+}
+
+/** GraphQL を投げて JSON を返す (試行ごとに台帳を 1 増やす)。本文が JSON として読めなければ null */
 async function requestStars(
   batch: StarBatch,
   token: string,
-  maxAttempts?: number,
+  budget: SubrequestBudget,
+  maxAttempts: number,
 ): Promise<StarsResponse | null> {
   // retry policy は cron-shared.fetchWithRetry に集約 (3 cron 横断で共有)。
   // 5xx / 403 secondary rate limit / 401 一過性 auth / timeout を吸収。
@@ -128,6 +153,9 @@ async function requestStars(
       label: "GitHub GraphQL",
       context: `batch=${batch.batchIndex}`,
       maxAttempts,
+      onAttempt: () => {
+        budget.used += 1;
+      },
     },
   );
   // 5/7 検証 7th: response body 途中切断で SyntaxError → batch スキップで完走。
@@ -161,22 +189,26 @@ async function requestStars(
 }
 
 /**
- * 応答から star 数と rename を読み取る。missing は data が null で、NOT_FOUND
- * (削除・改名で見つからないリポ) でもないエイリアス = 取り直す候補。
+ * 応答から star 数と rename を読み取る。missing は data が null (または応答に無い) で、NOT_FOUND
+ * (削除・改名で見つからないリポ) でもないエイリアス = 取り直す候補。理由は問わない
+ * (RESOURCE_LIMITS_EXCEEDED、問い合わせ全体の時間切れ等)。
  */
 function readStars(batch: StarBatch, json: StarsResponse) {
   const data = json.data ?? {};
-  const errors = json.errors ?? [];
-  const notFound = new Set(
-    errors.filter((e) => e.type === "NOT_FOUND").map((e) => e.path?.[0]),
+  const notFoundAliases = new Set(
+    (json.errors ?? [])
+      .filter((e) => e.type === "NOT_FOUND")
+      .map((e) => e.path?.[0]),
   );
   const stars: StarRow[] = [];
   const renames: RenameRow[] = [];
   const missing: string[] = [];
+  let notFound = 0;
   for (const [alias, original] of Object.entries(batch.repoMap)) {
     const repo = data[alias];
     if (!repo?.nameWithOwner) {
-      if (!notFound.has(alias)) missing.push(alias);
+      if (notFoundAliases.has(alias)) notFound += 1;
+      else missing.push(alias);
       continue;
     }
     stars.push({ repo: repo.nameWithOwner, stars: repo.stargazerCount });
@@ -184,29 +216,43 @@ function readStars(batch: StarBatch, json: StarsResponse) {
       renames.push({ from: original, to: repo.nameWithOwner });
     }
   }
-  const resourceLimited = errors.some(
-    (e) => e.type === "RESOURCE_LIMITS_EXCEEDED",
-  );
-  return { stars, renames, missing, resourceLimited };
+  return { stars, renames, missing, notFound };
 }
 
 export async function fetchBatch(
   batch: StarBatch,
   token: string,
-  budget: RefetchBudget = { remaining: MAX_REFETCH_REQUESTS },
+  budget: SubrequestBudget = {
+    used: 0,
+    pending: 0,
+    refetchLeft: MAX_REFETCH_REQUESTS,
+  },
 ): Promise<BatchResult> {
   const refetch: RefetchStats = { requests: 0, recovered: 0, unrecovered: 0 };
-  const json = await requestStars(batch, token);
-  if (!json) return { stars: [], renames: [], refetch };
-  const first = readStars(batch, json);
-  if (!first.resourceLimited || first.missing.length === 0) {
-    return { stars: first.stars, renames: first.renames, refetch };
+  const json = await requestStars(
+    batch,
+    token,
+    budget,
+    mainAttemptsFor(budget),
+  );
+  // 本文が JSON として読めなければ (途中切れ等)、全件を取り直しの候補にする
+  const first = json
+    ? readStars(batch, json)
+    : {
+        stars: [],
+        renames: [],
+        missing: Object.keys(batch.repoMap),
+        notFound: 0,
+      };
+  let notFound = first.notFound;
+  if (first.missing.length === 0) {
+    return { stars: first.stars, renames: first.renames, notFound, refetch };
   }
 
-  // RESOURCE_LIMITS_EXCEEDED で null になった分だけ、小さい問い合わせで取り直す。
-  // 取り直しも上限超過なら半分に割る (MAX_REFETCH_SPLITS 段まで)。
-  // 問い合わせ 1 回 = subrequest 1 回にするため fetchWithRetry の再試行はせず (maxAttempts 1)、
-  // 回数は 1 実行で共有する budget で抑える。取れなかった分は unrecovered に数えて表に出す。
+  // null になった分だけ、小さい問い合わせで取り直す。取り直しでも取れなければ半分に割る
+  // (MAX_REFETCH_SPLITS 段まで)。問い合わせ 1 回 = subrequest 1 回にするため fetchWithRetry の
+  // 再試行はせず (maxAttempts 1)、回数は 1 実行で共有する台帳で抑える (canRefetch)。
+  // 取れなかった分は unrecovered に数えて表に出す。
   const stars = [...first.stars];
   const renames = [...first.renames];
   const queue: { aliases: string[]; splits: number }[] = [];
@@ -217,17 +263,17 @@ export async function fetchBatch(
     });
   }
   for (let job = queue.shift(); job; job = queue.shift()) {
-    if (budget.remaining <= 0) {
+    if (!canRefetch(budget)) {
       refetch.unrecovered += job.aliases.length;
       continue;
     }
-    budget.remaining -= 1;
+    budget.refetchLeft -= 1;
     refetch.requests += 1;
     await new Promise((r) => setTimeout(r, BATCH_INTERVAL_MS));
     const sub = buildStarSubBatch(batch, job.aliases);
     let res: StarsResponse | null = null;
     try {
-      res = await requestStars(sub, token, 1);
+      res = await requestStars(sub, token, budget, 1);
     } catch (e) {
       console.log(
         JSON.stringify({
@@ -245,12 +291,9 @@ export async function fetchBatch(
     const got = readStars(sub, res);
     stars.push(...got.stars);
     renames.push(...got.renames);
+    notFound += got.notFound;
     refetch.recovered += got.stars.length;
-    if (
-      got.resourceLimited &&
-      got.missing.length > 1 &&
-      job.splits < MAX_REFETCH_SPLITS
-    ) {
+    if (got.missing.length > 1 && job.splits < MAX_REFETCH_SPLITS) {
       const half = Math.ceil(got.missing.length / 2);
       queue.push(
         { aliases: got.missing.slice(0, half), splits: job.splits + 1 },
@@ -268,10 +311,11 @@ export async function fetchBatch(
       requests: refetch.requests,
       recovered: refetch.recovered,
       unrecovered: refetch.unrecovered,
-      budget_left: budget.remaining,
+      refetch_left: budget.refetchLeft,
+      subrequests_used: budget.used,
     }),
   );
-  return { stars, renames, refetch };
+  return { stars, renames, notFound, refetch };
 }
 
 /** Healthchecks ping（成功・失敗両方の経路で使う、非ブロッキング前提）。 */
@@ -408,29 +452,37 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
 
   // 2. バッチ作成
   const batches = buildStarBatches(repos);
-  const refetchBudget: RefetchBudget = {
-    remaining: refetchBudgetFor(batches.length),
+  const budget: SubrequestBudget = {
+    used: WARMUP_SUBREQUESTS,
+    pending: 0,
+    refetchLeft: MAX_REFETCH_REQUESTS,
   };
 
   // 3. 順次 fetch（GitHub secondary rate limit 回避のため間隔を空ける）
   const allStars: StarRow[] = [];
   const allRenames: RenameRow[] = [];
   const failedBatches: number[] = [];
+  /** 落ちた batch に入っていたリポ数 */
+  let failedBatchRepos = 0;
+  let notFound = 0;
   const refetch: RefetchStats = { requests: 0, recovered: 0, unrecovered: 0 };
   for (let i = 0; i < batches.length; i++) {
     const batch = batches[i];
+    budget.pending = batches.length - i - 1 + TAIL_SUBREQUESTS;
     // retry を尽くしても落ちた 1 batch で全日データ (~2700件) を失わないよう、
     // 該当 batch だけ skip して継続する (parse-fail 経路と同じ graceful 思想)。
     // skip は後段の obs-notify warning で必ず表に出す (silent truncation 禁止)。
     try {
-      const result = await fetchBatch(batch, env.GITHUB_TOKEN, refetchBudget);
+      const result = await fetchBatch(batch, env.GITHUB_TOKEN, budget);
       allStars.push(...result.stars);
       allRenames.push(...result.renames);
+      notFound += result.notFound;
       refetch.requests += result.refetch.requests;
       refetch.recovered += result.refetch.recovered;
       refetch.unrecovered += result.refetch.unrecovered;
     } catch (e) {
       failedBatches.push(batch.batchIndex);
+      failedBatchRepos += Object.keys(batch.repoMap).length;
       console.log(
         JSON.stringify({
           type: "batch_skipped",
@@ -491,19 +543,25 @@ export async function runDailyStars(env: DailyStarsEnv): Promise<{
       ? ` / refetch=${refetch.requests} recovered=${refetch.recovered}${refetch.unrecovered ? ` / ⚠ unrecovered=${refetch.unrecovered}` : ""}`
       : "";
   const summary = `daily-stars${dryRun ? " (dry-run)" : ""}: ${allStars.length} stars / ${allRenames.length} renames (applied=${renameResult.applied} skipped=${renameResult.skipped} errors=${renameResult.errors}) / ${(durationMs / 1000).toFixed(1)}s${failedNote}${refetchNote}`;
+  // 追跡件数 = fetched + not_found + skipped_repos (黙って消える分を作らない)
   console.log(
     JSON.stringify({
       type: "daily_stars_done",
       fetched: allStars.length,
       inserted,
+      not_found: notFound,
       renamed: allRenames.length,
       renames_applied: renameResult.applied,
       renames_skipped: renameResult.skipped,
       renames_errors: renameResult.errors,
       skipped_batches: failedBatches.length,
+      // 取りこぼし = 落ちた batch のリポ + 取り直しても取れなかったリポ
+      skipped_repos: failedBatchRepos + refetch.unrecovered,
       refetch_requests: refetch.requests,
       refetch_recovered: refetch.recovered,
       refetch_unrecovered: refetch.unrecovered,
+      // warm-up と GraphQL (再試行・取り直し込み) の数。この後に通知と HC ping の 2 回が足される
+      subrequests_used: budget.used,
       duration_ms: durationMs,
       dry_run: dryRun,
     }),

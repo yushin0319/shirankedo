@@ -40,12 +40,17 @@ describe("runDailyStars graceful skip", () => {
         }
         if (url.includes("api.github.com/graphql")) {
           graphqlCalls += 1;
-          // batch 0 は成功 (1 件 data) / batch 1 は 400 (非 retry → 即 throw → skip)
+          // batch 0 (r0..r149) は全件成功 / batch 1 は 400 (非 retry → 即 throw → skip)
           if (graphqlCalls === 1) {
             return jsonResponse({
-              data: {
-                r0: { nameWithOwner: "facebook/react", stargazerCount: 100 },
-              },
+              data: Object.fromEntries(
+                repos
+                  .slice(0, 150)
+                  .map((r, i) => [
+                    `r${i}`,
+                    { nameWithOwner: r.repo, stargazerCount: 100 },
+                  ]),
+              ),
             });
           }
           return new Response("bad request", { status: 400 });
@@ -63,14 +68,34 @@ describe("runDailyStars graceful skip", () => {
       // HC_PING_KEY は未設定 → HC ping をスキップ
     };
 
+    const logs: string[] = [];
+    vi.spyOn(console, "log").mockImplementation((msg: unknown) => {
+      logs.push(String(msg));
+    });
+
     const result = await runDailyStars(env);
 
     // batch 1 が落ちても batch 0 の成功分は insert されている
     expect(graphqlCalls).toBe(2);
-    expect(result.inserted).toBe(1);
+    expect(result.inserted).toBe(150);
     const rows = await db.select().from(repoStats);
-    expect(rows).toHaveLength(1);
-    expect(rows[0].repo).toBe("facebook/react");
+    expect(rows).toHaveLength(150);
+
+    // 落ちた batch のリポ数を取りこぼしとして数える
+    const done = logs
+      .map((l) => {
+        try {
+          return JSON.parse(l) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .find((j) => j?.type === "daily_stars_done");
+    expect(done).toMatchObject({
+      fetched: 150,
+      skipped_batches: 1,
+      skipped_repos: 50,
+    });
 
     // 部分欠損は info で埋もれさせず warning で表に出す
     expect(obsBodies).toHaveLength(1);

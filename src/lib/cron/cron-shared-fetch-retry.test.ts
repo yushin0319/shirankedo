@@ -182,6 +182,25 @@ describe("fetchWithRetry", () => {
     expect(await res.text()).toBe("<rss>feed</rss>");
   });
 
+  it("onAttempt は再試行も含めて fetch を投げるたびに 1 回呼ばれる", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response("bad gateway", { status: 502 }))
+      .mockRejectedValueOnce(new Error("timed out"))
+      .mockResolvedValueOnce(okResponse());
+    let attempts = 0;
+
+    const promise = fetchWithRetry(
+      "https://example.test",
+      {},
+      { label: "T", onAttempt: () => attempts++ },
+    );
+    await vi.advanceTimersByTimeAsync(5000);
+    await promise;
+
+    expect(attempts).toBe(3);
+  }, 30000);
+
   it("204 (本文なし) でも Response を返せる", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
       new Response(null, { status: 204 }),

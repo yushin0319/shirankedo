@@ -61,6 +61,8 @@ export interface FetchRetryOptions {
   rateLimitWaitMs?: number;
   /** linear backoff の上限 (ms) */
   retrySleepCapMs?: number;
+  /** fetch を投げる直前に毎回呼ぶ (再試行を含む)。subrequest の数を数えるのに使う */
+  onAttempt?: () => void;
 }
 
 export async function fetchWithRetry(
@@ -76,6 +78,7 @@ export async function fetchWithRetry(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     let res: Response;
     let phase: "headers" | "body" = "headers";
+    opts.onAttempt?.();
     try {
       res = await fetch(url, {
         ...init,
