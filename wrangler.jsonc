@@ -16,7 +16,7 @@
   "observability": {
     "enabled": true
   },
-  // M11: level=error / exception を observability-tail Worker に流して Discord 通知
+  // level=error / exception を observability-tail Worker に流し、Notion の観測性 DB に warning として記録する (Discord には毎日 23:00 のまとめに載る)
   "tail_consumers": [
     {
       "service": "observability-tail"
