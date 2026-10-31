@@ -2,69 +2,25 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getDb } from "../../db/client";
 import { repoStats, trackingRepos } from "../../db/schema";
 import { createTestDbWithTables } from "../../db/test-helper";
-import { buildStarBatches } from "./build-star-batches";
-import {
-  type DailyStarsEnv,
-  fetchBatch,
-  refetchBudgetFor,
-  runDailyStars,
-} from "./daily-stars";
+import { type DailyStarsEnv, fetchBatch, runDailyStars } from "./daily-stars";
 import { fakeObsBinding } from "./test-obs-binding";
+import {
+  aliasesOf,
+  allFound,
+  allFoundExcept,
+  allLimited,
+  batchOf,
+  freshBudget,
+  jsonResponse,
+  notFound,
+  resourceLimited,
+} from "./test-star-graphql";
 
 vi.mock("../../db/client", () => ({ getDb: vi.fn() }));
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
-
-const jsonResponse = (body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
-
-const resourceLimited = (alias: string) => ({
-  type: "RESOURCE_LIMITS_EXCEEDED",
-  path: [alias, "nameWithOwner"],
-  message: "Resource limits for this query exceeded.",
-});
-const notFound = (alias: string) => ({
-  type: "NOT_FOUND",
-  path: [alias],
-  message: "Could not resolve to a Repository with the name 'x'.",
-});
-
-/** owner{i}/repo{i} を n 件並べた 1 バッチ (エイリアスは r0..r{n-1}) */
-const batchOf = (n: number) =>
-  buildStarBatches(
-    Array.from({ length: n }, (_, i) => ({ repo: `owner${i}/repo${i}` })),
-  )[0];
-
-/** GraphQL の POST 本文から、問い合わせたエイリアスと owner/name の組を取り出す */
-const requested = (init?: RequestInit) => {
-  const { query } = JSON.parse(String(init?.body)) as { query: string };
-  return [
-    ...query.matchAll(
-      /(r\d+): repository\(owner: "([^"]*)", name: "([^"]*)"\)/g,
-    ),
-  ].map((m) => ({ alias: m[1], repo: `${m[2]}/${m[3]}` }));
-};
-const aliasesOf = (init?: RequestInit) => requested(init).map((r) => r.alias);
-
-/** 問い合わせられたエイリアスを全部そろえて返す成功応答 */
-const allFound = (init?: RequestInit) =>
-  jsonResponse({
-    data: Object.fromEntries(
-      requested(init).map((r) => [
-        r.alias,
-        { nameWithOwner: r.repo, stargazerCount: 1 },
-      ]),
-    ),
-  });
-
-/** 問い合わせられたエイリアスが全部 RESOURCE_LIMITS_EXCEEDED で null になる応答 */
-const allLimited = (aliases: string[]) =>
-  jsonResponse({ data: null, errors: aliases.map(resourceLimited) });
 
 describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
   it("RESOURCE_LIMITS_EXCEEDED で null になった分だけ取り直して全件そろう", async () => {
@@ -93,7 +49,7 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
       },
     );
 
-    const result = await fetchBatch(batchOf(4), "TOKEN", { remaining: 6 });
+    const result = await fetchBatch(batchOf(4), "TOKEN", freshBudget());
 
     expect(calls).toEqual([
       ["r0", "r1", "r2", "r3"],
@@ -121,7 +77,7 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
       },
     );
 
-    const result = await fetchBatch(batchOf(4), "TOKEN", { remaining: 6 });
+    const result = await fetchBatch(batchOf(4), "TOKEN", freshBudget());
 
     // 本体 1 回 → まとめて取り直し 1 回 → 半分ずつ 2 回 (2 段まで)
     expect(calls).toEqual([
@@ -150,7 +106,7 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
       }),
     );
 
-    const result = await fetchBatch(batchOf(3), "TOKEN", { remaining: 6 });
+    const result = await fetchBatch(batchOf(3), "TOKEN", freshBudget());
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(result.stars).toHaveLength(2);
@@ -170,14 +126,14 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
         return calls.length === 1 ? allLimited(aliases) : allFound(init);
       },
     );
-    const budget = { remaining: 1 };
+    const budget = freshBudget({ refetchLeft: 1 });
 
     const result = await fetchBatch(batchOf(150), "TOKEN", budget);
 
     // 150 件の取り直しは 75 件ずつ 2 回の予定だが、残り 1 回分しか無い
     expect(calls).toHaveLength(2);
     expect(calls[1]).toHaveLength(75);
-    expect(budget.remaining).toBe(0);
+    expect(budget.refetchLeft).toBe(0);
     expect(result.stars).toHaveLength(75);
     expect(result.refetch).toEqual({
       requests: 1,
@@ -192,7 +148,7 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
       .mockResolvedValueOnce(allLimited(["r0", "r1"]))
       .mockResolvedValue(new Response("bad gateway", { status: 502 }));
 
-    const result = await fetchBatch(batchOf(2), "TOKEN", { remaining: 6 });
+    const result = await fetchBatch(batchOf(2), "TOKEN", freshBudget());
 
     // 取り直し 1 回が 502 → fetchWithRetry の再試行はしない (subrequest を増やさない)
     expect(spy).toHaveBeenCalledTimes(2);
@@ -201,16 +157,6 @@ describe("fetchBatch の RESOURCE_LIMITS_EXCEEDED 取り直し", () => {
       recovered: 0,
       unrecovered: 2,
     });
-  });
-});
-
-describe("refetchBudgetFor", () => {
-  it("subrequest 50 回の枠から本体の分と再試行の予備を引いた残りを、最大 6 回まで使う", () => {
-    // warm-up 1 + GraphQL 32 + 通知 1 + HC ping 1 = 35、予備 5 → 残り 10 → 上限 6
-    expect(refetchBudgetFor(32)).toBe(6);
-    expect(refetchBudgetFor(40)).toBe(2);
-    expect(refetchBudgetFor(42)).toBe(0);
-    expect(refetchBudgetFor(45)).toBe(0);
   });
 });
 
@@ -235,8 +181,10 @@ describe("runDailyStars の取り直し結果の報告", () => {
         if (url.includes("api.github.com/graphql")) {
           graphqlCalls += 1;
           const aliases = aliasesOf(init);
-          // batch 0 (150 件) は全件取れる / batch 1 (50 件) は取り直しても上限超過のまま
-          return aliases.includes("r0") ? allFound(init) : allLimited(aliases);
+          // batch 0 (150 件) は r7 だけ削除済み (NOT_FOUND) / batch 1 (50 件) は取り直しても上限超過のまま
+          return aliases.includes("r0")
+            ? allFoundExcept(init, ["r7"])
+            : allLimited(aliases);
         }
         throw new Error(`unexpected fetch: ${url}`);
       },
@@ -257,8 +205,8 @@ describe("runDailyStars の取り直し結果の報告", () => {
 
     // 本体 2 回 + batch 1 の取り直し (50 件 1 回 → 25 件 × 2 回)
     expect(graphqlCalls).toBe(5);
-    expect(result.inserted).toBe(150);
-    expect(await db.select().from(repoStats)).toHaveLength(150);
+    expect(result.inserted).toBe(149);
+    expect(await db.select().from(repoStats)).toHaveLength(149);
 
     const done = logs
       .map((l) => {
@@ -270,11 +218,19 @@ describe("runDailyStars の取り直し結果の報告", () => {
       })
       .find((j) => j?.type === "daily_stars_done");
     expect(done).toMatchObject({
+      fetched: 149,
+      not_found: 1,
       skipped_batches: 0,
+      skipped_repos: 50,
       refetch_requests: 3,
       refetch_recovered: 0,
       refetch_unrecovered: 50,
+      // warm-up 1 + 本体 2 + 取り直し 3 (この後の通知と HC ping は含まない)
+      subrequests_used: 6,
     });
+    // 追跡 200 件 = 取れた 149 + 削除済み 1 + 取りこぼし 50 (黙って消える分が無い)
+    const d = done as Record<string, number>;
+    expect(d.fetched + d.not_found + d.skipped_repos).toBe(200);
 
     expect(obsBodies).toHaveLength(1);
     expect(obsBodies[0].severity).toBe("warning");
