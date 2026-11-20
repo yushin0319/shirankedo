@@ -42,7 +42,7 @@ export const QUERY_WINDOW_DAYS = 45;
 export const DISPLAY_CAP = 100;
 
 /** 為替レート JPY/USD のフォールバック値 */
-export const JPY_PER_USD_FALLBACK = 150;
+export const JPY_PER_USD_FALLBACK = 160;
 
 /** 為替レート JPY/EUR のフォールバック値 */
-export const JPY_PER_EUR_FALLBACK = 163;
+export const JPY_PER_EUR_FALLBACK = 176;

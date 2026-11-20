@@ -7,6 +7,7 @@ import {
   getTier,
   parseModels,
 } from "../lib/ai";
+import { JPY_PER_EUR_FALLBACK, JPY_PER_USD_FALLBACK } from "../lib/constants";
 import {
   getProviderGapIndices,
   nextSortState,
@@ -54,8 +55,8 @@ function AiTabsInner({
   models,
   plans,
   providerDotClass,
-  jpyPerUsd = 150,
-  jpyPerEur = 163,
+  jpyPerUsd = JPY_PER_USD_FALLBACK,
+  jpyPerEur = JPY_PER_EUR_FALLBACK,
 }: AiTabsProps) {
   const [activeTab, setActiveTab] = useState<"text" | "sub">("text");
   const [apiSort, setApiSort] = useState<SortState>({
