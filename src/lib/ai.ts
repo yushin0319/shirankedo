@@ -1,3 +1,5 @@
+import { JPY_PER_EUR_FALLBACK, JPY_PER_USD_FALLBACK } from "./constants";
+
 // JSON文字列からモデルリストを安全にパース
 export function parseModels(json: string): string[] {
   try {
@@ -20,8 +22,8 @@ export function getTier(score: number): string {
 export function formatSubPrice(
   price: number,
   currency: string,
-  jpyPerUsd = 150,
-  jpyPerEur = 163,
+  jpyPerUsd = JPY_PER_USD_FALLBACK,
+  jpyPerEur = JPY_PER_EUR_FALLBACK,
 ): string {
   if (price === 0) return "¥0";
   if (currency === "JPY") return `¥${Math.round(price).toLocaleString()}`;
@@ -37,7 +39,7 @@ export function estimateMonthly(
   inputPrice: number,
   outputPrice: number,
   currency: string,
-  jpyPerUsd = 150,
+  jpyPerUsd = JPY_PER_USD_FALLBACK,
 ): string {
   const usd = inputPrice * 3.6 + outputPrice * 0.6;
   if (currency === "JPY") return `¥${Math.round(usd).toLocaleString()}`;
