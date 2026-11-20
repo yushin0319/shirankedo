@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Dependabot の自動マージ (github-actions のトークン) では push が起動しないので、
+  # main で手動実行して CI → Deploy (workflow_run) を走らせる口
+  workflow_dispatch:
 
 jobs:
   lint-and-build:
