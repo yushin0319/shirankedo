@@ -16,10 +16,10 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@astrojs/cloudflare": "^14.4.7",
-    "@astrojs/react": "^7.1.8",
+    "@astrojs/cloudflare": "^14.4.9",
+    "@astrojs/react": "^7.1.9",
     "@tailwindcss/vite": "^4.3.5",
-    "astro": "^7.4.11",
+    "astro": "^7.4.13",
     "drizzle-orm": "^0.45.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
