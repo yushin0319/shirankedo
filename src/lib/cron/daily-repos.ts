@@ -5,6 +5,7 @@ import {
   buildGeminiRequest,
   callGemini,
   fetchWithRetry,
+  type GeminiEnv,
   notifyObs,
   type ObsNotifyEnv,
   parseGeminiText,
@@ -21,10 +22,9 @@ const GH_SEARCH_BASE = "https://api.github.com/search/repositories";
 const SEARCH_DELAY_MS = 2000;
 const HC_SLUG = "shirankedo-daily-repos";
 
-export interface DailyReposEnv extends ObsNotifyEnv {
+export interface DailyReposEnv extends ObsNotifyEnv, GeminiEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
-  GEMINI_API_KEY: string;
   HC_PING_KEY?: string;
   DAILY_REPOS_ENABLED?: string;
 }
@@ -245,12 +245,9 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
     try {
       // 2026-08-09 / 09-16 に HTTP 524 (応答待ち約 2 分で打ち切り) で翻訳が落ち、
       // そのバッチが原文のまま D1 に残った。待ってから 1 回だけ再送する (待ち時間は callGemini の既定)
-      const resp = await callGemini(
-        env.GEMINI_API_KEY,
-        "gemini-2.5-flash",
-        geminiBody,
-        { maxAttempts: 2 },
-      );
+      const resp = await callGemini(env, "gemini-2.5-flash", geminiBody, {
+        maxAttempts: 2,
+      });
       text = parseGeminiText(resp);
     } catch (e: unknown) {
       geminiWarning = geminiWarning ?? String(e); // 最初の失敗を記録
