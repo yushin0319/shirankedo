@@ -56,6 +56,10 @@ describe("runDailyRepos の GitHub Search 本文タイムアウト", () => {
       DB: db as unknown as D1Database,
       GITHUB_TOKEN: "TOKEN",
       GEMINI_API_KEY: "KEY",
+      // 検索結果が 0 件なので Gemini までは進まない
+      GEMINI_RELAY: {
+        fetch: () => Promise.reject(new Error("unexpected Gemini call")),
+      },
     };
     const promise = runDailyRepos(env);
     const expectation = expect(promise).resolves.toBeUndefined();

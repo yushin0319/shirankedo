@@ -6,7 +6,8 @@ const HC_BASE = "https://hc-ping.com";
  * fetch すると error 1042 で失敗するため、公開 URL は使わない。
  */
 const OBS_NOTIFY_URL = "https://observability-tail/obs-notify";
-const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+/** gemini-relay への Service binding 経由で送るのでホスト名は使われず、パスだけが届く */
+const GEMINI_RELAY_BASE = "https://gemini-relay/v1beta/models";
 const SHIRANKEDO_BASE = "https://shirankedo.y-fudo.workers.dev/api/ingest";
 
 export interface GeminiResponseShape {
@@ -234,41 +235,57 @@ export interface GeminiCallOptions {
   maxAttempts?: number;
   /** 再試行前の待ち (ms)。524 (Cloudflare のタイムアウト) は即再送だと効かないので長めにする */
   backoffMs?: number;
-  /**
-   * gemini-relay への Service binding。あればそこ経由で送る (cron が香港などで動いた日も米国から Gemini を呼べる)。
-   * 中継は URL のパスだけを見るので、URL は直接呼ぶときと同じでよい
-   */
-  relay?: ServiceBinding;
 }
 
 /** Gemini を呼ぶ cron が env に持つもの */
-export interface GeminiRelayEnv {
-  /** gemini-relay Worker への Service binding (fetch() で呼ぶこと。RPC には中継の配置指定が効かない) */
-  GEMINI_RELAY?: ServiceBinding;
+export interface GeminiEnv {
+  GEMINI_API_KEY: string;
+  /** gemini-relay Worker への Service binding。Gemini はここ経由でだけ呼ぶ */
+  GEMINI_RELAY: ServiceBinding;
 }
 
 export async function callGemini(
-  apiKey: string,
+  env: GeminiEnv,
   model: string,
   body: string,
   opts: GeminiCallOptions = {},
 ): Promise<GeminiResponseShape> {
+  // run-cron.ts は env をキャストして渡すので、型が必須でも実行時に無いことがある。
+  // 直接呼ぶ経路には戻さない (香港で動いた日に 400 になる)
+  const relay = env.GEMINI_RELAY;
+  if (!relay) {
+    throw new Error(
+      "GEMINI_RELAY service binding がありません (wrangler.jsonc の services)",
+    );
+  }
   const maxAttempts = opts.maxAttempts ?? 1;
   const backoffMs = opts.backoffMs ?? 10000;
   const suffix = (attempt: number) =>
     maxAttempts > 1 ? ` (after ${attempt} attempts)` : "";
+  // キーは URL に載せずヘッダで送る (中継はクエリを捨てる)
+  const url = `${GEMINI_RELAY_BASE}/${model}:generateContent`;
+  const init: RequestInit = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": env.GEMINI_API_KEY,
+    },
+    body,
+  };
   for (let attempt = 1; ; attempt++) {
     const canRetry = attempt < maxAttempts;
     let res: Response;
-    // キーは URL に載せずヘッダで送る (中継はクエリを捨てる。ログにもキーが残らない)
-    const url = `${GEMINI_BASE}/${model}:generateContent`;
-    const init: RequestInit = {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body,
-    };
     try {
-      res = await (opts.relay ? opts.relay.fetch(url, init) : fetch(url, init));
+      res = await relay.fetch(url, init);
+      // 中継が米国に回されて動いたか (remote-<拠点>) を毎回残す。呼ぶのは 1 日数回
+      console.log(
+        JSON.stringify({
+          type: "gemini_relay",
+          model,
+          status: res.status,
+          placement: res.headers.get("cf-placement"),
+        }),
+      );
     } catch (e: unknown) {
       if (!canRetry) {
         // 既定 (再試行なし) では従来どおり元の例外をそのまま投げる
