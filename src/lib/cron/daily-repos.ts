@@ -5,6 +5,7 @@ import {
   buildGeminiRequest,
   callGemini,
   fetchWithRetry,
+  type GeminiRelayEnv,
   notifyObs,
   type ObsNotifyEnv,
   parseGeminiText,
@@ -21,7 +22,7 @@ const GH_SEARCH_BASE = "https://api.github.com/search/repositories";
 const SEARCH_DELAY_MS = 2000;
 const HC_SLUG = "shirankedo-daily-repos";
 
-export interface DailyReposEnv extends ObsNotifyEnv {
+export interface DailyReposEnv extends ObsNotifyEnv, GeminiRelayEnv {
   DB: D1Database;
   GITHUB_TOKEN: string;
   GEMINI_API_KEY: string;
@@ -249,7 +250,7 @@ export async function runDailyRepos(env: DailyReposEnv): Promise<void> {
         env.GEMINI_API_KEY,
         "gemini-2.5-flash",
         geminiBody,
-        { maxAttempts: 2 },
+        { maxAttempts: 2, relay: env.GEMINI_RELAY },
       );
       text = parseGeminiText(resp);
     } catch (e: unknown) {

@@ -234,6 +234,17 @@ export interface GeminiCallOptions {
   maxAttempts?: number;
   /** 再試行前の待ち (ms)。524 (Cloudflare のタイムアウト) は即再送だと効かないので長めにする */
   backoffMs?: number;
+  /**
+   * gemini-relay への Service binding。あればそこ経由で送る (cron が香港などで動いた日も米国から Gemini を呼べる)。
+   * 中継は URL のパスだけを見るので、URL は直接呼ぶときと同じでよい
+   */
+  relay?: ServiceBinding;
+}
+
+/** Gemini を呼ぶ cron が env に持つもの */
+export interface GeminiRelayEnv {
+  /** gemini-relay Worker への Service binding (fetch() で呼ぶこと。RPC には中継の配置指定が効かない) */
+  GEMINI_RELAY?: ServiceBinding;
 }
 
 export async function callGemini(
@@ -249,15 +260,15 @@ export async function callGemini(
   for (let attempt = 1; ; attempt++) {
     const canRetry = attempt < maxAttempts;
     let res: Response;
+    // キーは URL に載せずヘッダで送る (中継はクエリを捨てる。ログにもキーが残らない)
+    const url = `${GEMINI_BASE}/${model}:generateContent`;
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body,
+    };
     try {
-      res = await fetch(
-        `${GEMINI_BASE}/${model}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body,
-        },
-      );
+      res = await (opts.relay ? opts.relay.fetch(url, init) : fetch(url, init));
     } catch (e: unknown) {
       if (!canRetry) {
         // 既定 (再試行なし) では従来どおり元の例外をそのまま投げる

@@ -28,6 +28,13 @@
     {
       "binding": "OBS",
       "service": "observability-tail"
+    },
+    // Gemini を米国から呼ぶ中継 (gemini-relay)。cron は実行のたびに拠点が変わり、香港で動いた日は
+    // Gemini が 400「User location is not supported」を返すので、Gemini 呼び出しはここを通す。
+    // 中継の配置指定は fetch() で呼んだときだけ効く (RPC にはしない)
+    {
+      "binding": "GEMINI_RELAY",
+      "service": "gemini-relay"
     }
   ],
   "vars": {

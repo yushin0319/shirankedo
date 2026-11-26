@@ -5,6 +5,7 @@ import {
   buildGeminiRequest,
   callGemini,
   fetchWithRetry,
+  type GeminiRelayEnv,
   notifyObs,
   type ObsNotifyEnv,
   parseGeminiJson,
@@ -25,7 +26,7 @@ const RSS_SOURCES = [
 const ARXIV_URL =
   "http://export.arxiv.org/api/query?search_query=cat:cs.*&sortBy=submittedDate&sortOrder=descending&max_results=30";
 
-export interface DailyArticlesEnv extends ObsNotifyEnv {
+export interface DailyArticlesEnv extends ObsNotifyEnv, GeminiRelayEnv {
   DB: D1Database;
   GEMINI_API_KEY: string;
   HC_PING_KEY?: string;
@@ -340,7 +341,7 @@ JSONのみ出力してください。`;
       env.GEMINI_API_KEY,
       "gemini-2.5-flash",
       selectionBody,
-      { maxAttempts: 2 },
+      { maxAttempts: 2, relay: env.GEMINI_RELAY },
     );
     selectionResult = parseGeminiJson<SelectionResult>(resp);
   } catch (e: unknown) {
@@ -494,7 +495,7 @@ JSONのみ出力してください。`;
       env.GEMINI_API_KEY,
       "gemini-3-flash-preview",
       summaryBody,
-      { maxAttempts: 2 },
+      { maxAttempts: 2, relay: env.GEMINI_RELAY },
     );
     const parsed = parseGeminiJson<SummaryEntry[]>(resp);
     summaries = Array.isArray(parsed) ? parsed : [];

@@ -103,4 +103,63 @@ describe("callGemini", () => {
     ).rejects.toThrow(/Gemini m fetch failed \(after 2 attempts\): .*timeout/);
     expect(spy).toHaveBeenCalledTimes(2);
   });
+
+  it("API キーは URL のクエリではなく x-goog-api-key ヘッダで送る", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockResolvedValue(geminiOk());
+
+    await callGemini("secret-key", "gemini-2.5-flash", "{}");
+
+    const [url, init] = spy.mock.calls[0];
+    expect(String(url)).toBe(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+    );
+    expect(new Headers(init?.headers).get("x-goog-api-key")).toBe("secret-key");
+  });
+});
+
+describe("callGemini (中継 gemini-relay 経由)", () => {
+  it("relay を渡すと relay の fetch で送り、グローバル fetch は使わない", async () => {
+    const globalFetch = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValue(new Error("global fetch must not be used"));
+    const relay = { fetch: vi.fn().mockResolvedValue(geminiOk()) };
+
+    const res = await callGemini("secret-key", "gemini-2.5-flash", '{"a":1}', {
+      relay,
+    });
+
+    expect(res.candidates?.[0]?.content?.parts?.[0]?.text).toBe("ok");
+    expect(globalFetch).not.toHaveBeenCalled();
+    expect(relay.fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = relay.fetch.mock.calls[0];
+    // 中継は URL のパスだけを見て generativelanguage.googleapis.com に送る
+    expect(new URL(url).pathname).toBe(
+      "/v1beta/models/gemini-2.5-flash:generateContent",
+    );
+    expect(url).not.toContain("secret-key");
+    expect(new Headers(init.headers).get("x-goog-api-key")).toBe("secret-key");
+    expect(init.body).toBe('{"a":1}');
+  });
+
+  it("relay 経由でも 5xx は backoff のあと relay で再送する", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      new Error("global fetch must not be used"),
+    );
+    const relay = {
+      fetch: vi
+        .fn()
+        .mockResolvedValueOnce(new Response("", { status: 503 }))
+        .mockResolvedValueOnce(geminiOk()),
+    };
+
+    const promise = callGemini("k", "gemini-2.5-flash", "{}", {
+      maxAttempts: 2,
+      relay,
+    });
+    await vi.advanceTimersByTimeAsync(10000);
+    await promise;
+
+    expect(relay.fetch).toHaveBeenCalledTimes(2);
+  });
 });
